@@ -14,7 +14,7 @@ if __name__ == "__main__":
     # Mỗi expert là một MLP nhỏ
     experts = [resnet18_backbone for _ in range(4)]
 
-    model = DenseMoE(experts=experts, input_shape=input_shape, output_size=10)
+    model = DenseMoE(experts=experts, input_shape=input_shape)
     output = model(input_tensor)
     print(output.shape)
 

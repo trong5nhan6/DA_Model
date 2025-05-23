@@ -7,8 +7,8 @@ import math
 class DenseMoE(nn.Module):
     def __init__(self,
                  experts,               # List[Module]
-                 input_shape,           # Tuple like (C, H, W) or (features,)
-                 output_size=10):       # Output dim
+                 input_shape):          # Tuple like (C, H, W) or (features,)
+
         super(DenseMoE, self).__init__()
 
         self.experts = nn.ModuleList(experts)
