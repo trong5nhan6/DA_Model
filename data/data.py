@@ -19,10 +19,10 @@ def set_seed(seed=42):
     torch.backends.cudnn.benchmark = False
 
 
-def make_loader(dataset, batch_size=64, seed=42, shuffle=True):
+def make_loader(dataset, batch_size=64, seed=42, shuffle=True, num_workers=4):
     g = torch.Generator()
     g.manual_seed(seed)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=g, num_workers=4)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=g, num_workers=num_workers)
 
 
 def load_mnist_and_mnistm_from_folder(mnistm_root, batch_size=64, seed=42, num_workers=4):
