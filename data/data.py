@@ -22,16 +22,10 @@ def set_seed(seed=42):
 def make_loader(dataset, batch_size=64, seed=42, shuffle=True):
     g = torch.Generator()
     g.manual_seed(seed)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=g)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=g, num_workers=4)
 
 
-def make_loader(dataset, batch_size=64, seed=42, shuffle=True):
-    g = torch.Generator()
-    g.manual_seed(seed)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=g)
-
-
-def load_mnist_and_mnistm_from_folder(mnistm_root, batch_size=64, seed=42):
+def load_mnist_and_mnistm_from_folder(mnistm_root, batch_size=64, seed=42, num_workers=4):
     transform_mnist = transforms.Compose([
         transforms.Resize((28, 28)),
         transforms.Grayscale(3),
@@ -58,12 +52,14 @@ def load_mnist_and_mnistm_from_folder(mnistm_root, batch_size=64, seed=42):
         root=f"{mnistm_root}/testing", transform=transform_mnistm)
 
     # Dataloaders
-    mnist_loader = make_loader(mnist_train, batch_size=batch_size, seed=seed)
+    mnist_loader = make_loader(
+        mnist_train, batch_size=batch_size, seed=seed, num_workers=num_workers)
     mnist_test_loader = make_loader(
-        mnist_test, batch_size=batch_size, seed=seed, shuffle=False)
-    mnistm_loader = make_loader(mnistm_train, batch_size=batch_size, seed=seed)
+        mnist_test, batch_size=batch_size, seed=seed, shuffle=False, num_workers=num_workers)
+    mnistm_loader = make_loader(
+        mnistm_train, batch_size=batch_size, seed=seed, num_workers=num_workers)
     mnistm_test_loader = make_loader(
-        mnistm_test, batch_size=batch_size, seed=seed, shuffle=False)
+        mnistm_test, batch_size=batch_size, seed=seed, shuffle=False, num_workers=num_workers)
 
     return mnist_loader, mnist_test_loader, mnistm_loader, mnistm_test_loader
 
