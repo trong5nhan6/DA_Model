@@ -1,6 +1,12 @@
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
+import numpy as np
+
+
+def compute_grl_lambda(current_epoch, total_epochs):
+    p = current_epoch / total_epochs
+    return 2.0 / (1.0 + np.exp(-10 * p)) - 1.0
 
 
 @torch.no_grad()
@@ -69,6 +75,8 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
         src_iter = iter(source_loader)
         tgt_iter = iter(target_loader)
 
+        grl_lambda = compute_grl_lambda(epoch, epochs)
+
         for _ in range(n_batches):
             # Get batch data from source and target
             xs, ys = next(src_iter)
@@ -85,7 +93,7 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             ]).to(device, non_blocking=True)
 
             # Forward pass
-            y_cls, y_dom = model(x_combined, alpha=1.0)
+            y_cls, y_dom = model(x_combined, alpha=grl_lambda)
             y_cls_src = y_cls[:xs.size(0)]
 
             # Calculate losses
