@@ -39,7 +39,7 @@ def evaluate(model, dataloader, device):
 
 
 def train_dann(model, source_loader, target_loader, source_test_loader, target_test_loader,
-               device, epochs=10, lr=1e-3, step_size=5, gamma=0.1, log_fn=None):
+               device, epochs=10, lr=1e-3, step_size=5, gamma=0.5, beta=0.8, lr_patience=8, log_fn=None):
     """
     Train DANN (Domain Adaptation Neural Network) model
     Args:
@@ -65,7 +65,7 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
     }
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=step_size, gamma=gamma)
+        optimizer, patience=lr_patience, step_size=step_size, gamma=gamma)
     criterion = nn.CrossEntropyLoss()
 
     for epoch in range(epochs):
@@ -101,7 +101,7 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             # Calculate losses
             loss_cls = criterion(y_cls_src, ys)  # Classification loss
             loss_dom = criterion(y_dom, y_domain)  # Domain adaptation loss
-            loss = loss_cls + loss_dom
+            loss = loss_cls + loss_dom*beta
 
             # Backward pass and parameter update
             optimizer.zero_grad()
