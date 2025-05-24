@@ -49,7 +49,7 @@ class Backbone(nn.Module):
             raise ValueError(f"Unsupported model type: {type(model)}")
 
         # Xác định số kênh đầu ra từ backbone
-        dummy = torch.zeros(1, in_channels, *img_size)
+        dummy = torch.zeros(2, in_channels, *img_size)
         with torch.no_grad():
             feat = self.pool(self.backbone(dummy))
             assert feat.ndim == 4 and feat.shape[2:] == (1, 1), \
