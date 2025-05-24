@@ -36,7 +36,8 @@ def make_loader(dataset, batch_size=64, seed=42, shuffle=True, num_workers=4, pi
         shuffle=shuffle,
         generator=g,
         num_workers=num_workers,
-        pin_memory=pin_memory
+        pin_memory=pin_memory,
+        persistent_workers=True
     )
 
 
@@ -114,13 +115,13 @@ def load_mnist_and_mnistm_from_folder(
 
     # Create dataloaders for training and testing
     mnist_loader = make_loader(mnist_train, batch_size, seed, shuffle=True,
-                               num_workers=num_workers, pin_memory=pin_memory) if mnist_train else None
+                               num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True) if mnist_train else None
     mnist_test_loader = make_loader(mnist_test, batch_size, seed, shuffle=False,
-                                    num_workers=num_workers, pin_memory=pin_memory) if mnist_test else None
+                                    num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True) if mnist_test else None
     mnistm_loader = make_loader(mnistm_train, batch_size, seed, shuffle=True,
-                                num_workers=num_workers, pin_memory=pin_memory) if mnistm_train else None
+                                num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True) if mnistm_train else None
     mnistm_test_loader = make_loader(mnistm_test, batch_size, seed, shuffle=False,
-                                     num_workers=num_workers, pin_memory=pin_memory) if mnistm_test else None
+                                     num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True) if mnistm_test else None
 
     return mnist_loader, mnist_test_loader, mnistm_loader, mnistm_test_loader
 
