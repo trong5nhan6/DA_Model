@@ -5,6 +5,14 @@ import numpy as np
 
 
 def compute_grl_lambda(current_epoch, total_epochs):
+    """
+    Compute the Gradient Reversal Layer (GRL) lambda value based on training progress
+    Args:
+        current_epoch: Current training epoch
+        total_epochs: Total number of training epochs
+    Returns:
+        Lambda value that gradually increases from 0 to 1 during training
+    """
     p = current_epoch / total_epochs
     return 2.0 / (1.0 + np.exp(-10 * p)) - 1.0
 
@@ -20,7 +28,7 @@ def evaluate(model, dataloader, device):
     Returns:
         Accuracy rate on the dataset
     """
-    model.eval()
+    model.eval()  # Set model to evaluation mode
     correct = 0
     total = 0
 
@@ -29,9 +37,11 @@ def evaluate(model, dataloader, device):
         xs, ys = next(data_iter)
         xs, ys = xs.to(device), ys.to(device)
 
+        # Forward pass without gradient computation
         logits, _ = model(xs, alpha=0.0)
         preds = logits.argmax(dim=1)
 
+        # Calculate accuracy
         correct += (preds == ys).sum().item()
         total += ys.size(0)
 
@@ -50,11 +60,15 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
         target_test_loader: DataLoader for target test data
         device: Computing device (CPU/GPU)
         epochs: Number of training epochs
+        lr: Learning rate
+        step_size: Step size for learning rate scheduler
+        gamma: Learning rate decay factor
+        beta: Weight for domain adaptation loss
         log_fn: Callback function for logging (optional)
     Returns:
         Training history containing metrics
     """
-    # Initialize training history dictionary
+    # Initialize training history dictionary to track metrics
     history = {
         'epoch': [],
         'train_cls_loss': [],
@@ -63,20 +77,25 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
         'test_acc': [],
         'target_acc': []
     }
+
+    # Initialize optimizer and learning rate scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer, step_size=step_size, gamma=gamma)
     criterion = nn.CrossEntropyLoss()
 
     for epoch in range(epochs):
-        model.train()
+        model.train()  # Set model to training mode
         total_cls_loss = 0.0
         total_dom_loss = 0.0
         total_samples = 0
+
+        # Get minimum number of batches between source and target
         n_batches = min(len(source_loader), len(target_loader))
         src_iter = iter(source_loader)
         tgt_iter = iter(target_loader)
 
+        # Compute GRL lambda for current epoch
         grl_lambda = compute_grl_lambda(epoch, epochs)
 
         for _ in range(n_batches):
@@ -98,7 +117,7 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             y_cls, y_dom = model(x_combined, alpha=grl_lambda)
             y_cls_src = y_cls[:xs.size(0)]
 
-            # Calculate losses
+            # Calculate classification and domain adaptation losses
             loss_cls = criterion(y_cls_src, ys)  # Classification loss
             loss_dom = criterion(y_dom, y_domain)  # Domain adaptation loss
             loss = loss_cls + loss_dom*beta
