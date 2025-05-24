@@ -15,7 +15,7 @@ def set_seed(seed=42):
     torch.backends.cudnn.benchmark = False
 
 
-def make_loader(dataset, batch_size=64, seed=42, shuffle=True, num_workers=4, pin_memory=True):
+def make_loader(dataset, batch_size=64, seed=42, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True):
     """
     Create a DataLoader with specified parameters
     Args:
@@ -37,7 +37,7 @@ def make_loader(dataset, batch_size=64, seed=42, shuffle=True, num_workers=4, pi
         generator=g,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        persistent_workers=True
+        persistent_workers=persistent_workers
     )
 
 
