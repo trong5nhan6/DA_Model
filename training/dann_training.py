@@ -64,6 +64,8 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
         'target_acc': []
     }
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=5, gamma=0.5)
     criterion = nn.CrossEntropyLoss()
 
     for epoch in range(epochs):
@@ -110,6 +112,8 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             total_cls_loss += loss_cls.item() * xs.size(0)
             total_dom_loss += loss_dom.item() * x_combined.size(0)
             total_samples += xs.size(0)
+
+        scheduler.step()
 
         # Calculate average losses
         avg_cls_loss = total_cls_loss / total_samples

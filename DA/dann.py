@@ -25,7 +25,7 @@ class GRL(nn.Module):
 
 
 # --- DANN model with pluggable Feature Extractor ---
-class DANN_MoE(nn.Module):
+class DANN(nn.Module):
     def __init__(self, feature_extractor, feat_dim, num_classes=10, grl_lambda=1.0):
         """
         Args:
