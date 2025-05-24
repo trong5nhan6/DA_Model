@@ -5,6 +5,15 @@ import matplotlib.pyplot as plt
 
 @torch.no_grad()
 def evaluate(model, dataloader, device):
+    """
+    Evaluate model performance on a dataset
+    Args:
+        model: Model to evaluate
+        dataloader: DataLoader containing evaluation data
+        device: Computing device (CPU/GPU)
+    Returns:
+        Accuracy rate on the dataset
+    """
     model.eval()
     correct = 0
     total = 0
@@ -25,6 +34,21 @@ def evaluate(model, dataloader, device):
 
 def train_dann(model, source_loader, target_loader, source_test_loader, target_test_loader,
                device, epochs=10, log_fn=None):
+    """
+    Train DANN (Domain Adaptation Neural Network) model
+    Args:
+        model: DANN model
+        source_loader: DataLoader for source data
+        target_loader: DataLoader for target data
+        source_test_loader: DataLoader for source test data
+        target_test_loader: DataLoader for target test data
+        device: Computing device (CPU/GPU)
+        epochs: Number of training epochs
+        log_fn: Callback function for logging (optional)
+    Returns:
+        Training history containing metrics
+    """
+    # Initialize training history dictionary
     history = {
         'epoch': [],
         'train_cls_loss': [],
@@ -46,40 +70,49 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
         tgt_iter = iter(target_loader)
 
         for _ in range(n_batches):
+            # Get batch data from source and target
             xs, ys = next(src_iter)
             xt, _ = next(tgt_iter)
             xs, ys = xs.to(device, non_blocking=True), ys.to(
                 device, non_blocking=True)
             xt = xt.to(device, non_blocking=True)
 
+            # Combine source and target data
             x_combined = torch.cat([xs, xt], dim=0)
             y_domain = torch.cat([
-                torch.zeros(xs.size(0), dtype=torch.long),
-                torch.ones(xt.size(0), dtype=torch.long)
+                torch.zeros(xs.size(0), dtype=torch.long),  # Source domain = 0
+                torch.ones(xt.size(0), dtype=torch.long)   # Target domain = 1
             ]).to(device, non_blocking=True)
 
+            # Forward pass
             y_cls, y_dom = model(x_combined, alpha=1.0)
             y_cls_src = y_cls[:xs.size(0)]
 
-            loss_cls = criterion(y_cls_src, ys)
-            loss_dom = criterion(y_dom, y_domain)
+            # Calculate losses
+            loss_cls = criterion(y_cls_src, ys)  # Classification loss
+            loss_dom = criterion(y_dom, y_domain)  # Domain adaptation loss
             loss = loss_cls + loss_dom
 
+            # Backward pass and parameter update
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
+            # Update statistics
             total_cls_loss += loss_cls.item() * xs.size(0)
             total_dom_loss += loss_dom.item() * x_combined.size(0)
             total_samples += xs.size(0)
 
+        # Calculate average losses
         avg_cls_loss = total_cls_loss / total_samples
         avg_dom_loss = total_dom_loss / (2 * total_samples)
 
+        # Evaluate model on datasets
         train_acc = evaluate(model, source_loader, device)
         test_acc = evaluate(model, source_test_loader, device)
         target_acc = evaluate(model, target_test_loader, device)
 
+        # Print results
         print(f"[Epoch {epoch+1:02d}] "
               f"ClsLoss: {avg_cls_loss:.4f} | DomLoss: {avg_dom_loss:.4f} | "
               f"TrainAcc: {train_acc*100:.2f}% | TestAcc: {test_acc*100:.2f}% | TargetAcc: {target_acc*100:.2f}%")
@@ -88,10 +121,12 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             history = results(history, epoch+1, avg_cls_loss,
                               avg_dom_loss, train_acc, test_acc, target_acc)
     return history
-# Ghi lại kết quả mỗi epoch
 
 
 def results(history, epoch, cls_loss, dom_loss, train_acc, test_acc, target_acc):
+    """
+    Update training history
+    """
     history['epoch'].append(epoch)
     history['train_cls_loss'].append(cls_loss)
     history['domain_loss'].append(dom_loss)
@@ -100,15 +135,18 @@ def results(history, epoch, cls_loss, dom_loss, train_acc, test_acc, target_acc)
     history['target_acc'].append(target_acc)
     return history
 
-# Hàm vẽ biểu đồ
-
 
 def plot_dann_history(history):
+    """
+    Plot training history
+    Args:
+        history: Dictionary containing training history
+    """
     epochs = history['epoch']
 
     plt.figure(figsize=(10, 4))
 
-    # Plot Losses
+    # Plot losses
     plt.subplot(1, 2, 1)
     plt.plot(epochs, history['train_cls_loss'], marker='o',
              color='blue', label='Classification Loss')
@@ -119,7 +157,7 @@ def plot_dann_history(history):
     plt.ylabel("Loss")
     plt.legend()
 
-    # Plot Accuracies
+    # Plot accuracies
     plt.subplot(1, 2, 2)
     plt.plot(epochs, [a * 100 for a in history['train_acc']],
              marker='o', color='green', label='Train Accuracy')
