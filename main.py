@@ -3,7 +3,7 @@ from Model.CNN.until import Backbone
 from Model.CNN.extract_backboone import get_resnet101
 from torchvision import models
 from MoE.DenseMoE import DenseMoE
-from MoE.SpareMoE import MeOViT
+from MoE.SparseMoE import MeOViT
 from DA.dann import DANN_MoE
 from DA.mcd import MCD
 
