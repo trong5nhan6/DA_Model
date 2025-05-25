@@ -67,8 +67,8 @@ class TransformerBlock(nn.Module):
     def forward(self, x):
         B = x.size(0)
         x = self.patch_embed(x)  # [B, N, C]
-        cls_token = self.cls_token.expand(B, -1, -1)  # [B, 1, C]
-        x = torch.cat((cls_token, x), dim=1)  # [B, N+1, C]
+        # cls_token = self.cls_token.expand(B, -1, -1)  # [B, 1, C]
+        # x = torch.cat((cls_token, x), dim=1)  # [B, N+1, C]
         x = x + self.pos_embed
         x = self.dropout(x)
 
@@ -266,10 +266,10 @@ class MeOViT(nn.Module):
         patch_tokens = self.vit(x)  # [B, N+1, D], N patches + CLS
 
         # Step 2: Remove CLS token, keep only patch tokens
-        patch_tokens_only = patch_tokens[:, 1:, :]  # [B, N, D]
+        # patch_tokens_only = patch_tokens[:, 1:, :]  # [B, N, D]
 
         # Step 3: Select important patches
-        selected_x, _ = self.priority(patch_tokens_only)  # [B, K, D]
+        selected_x, _ = self.priority(patch_tokens)  # [B, K, D]
 
         # Step 4: Process through Sparse MoE
         moe_out = self.moe(selected_x)  # [B, expert_dim]
