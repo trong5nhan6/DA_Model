@@ -67,10 +67,12 @@ def load_mnist_and_mnistm_from_folder(
     num_workers=4,
     mnist_ratio=1.0,
     mnistm_ratio=1.0,
-    pin_memory=True
+    pin_memory=True,
+    augment=False
 ):
     """
-    Load MNIST and MNIST-M datasets for domain adaptation
+    Load MNIST and MNIST-M datasets for domain adaptation, with optional data augmentation.
+
     Args:
         mnistm_root: Root directory containing MNIST-M dataset
         batch_size: Number of samples per batch
@@ -79,25 +81,47 @@ def load_mnist_and_mnistm_from_folder(
         mnist_ratio: Ratio of MNIST samples to use
         mnistm_ratio: Ratio of MNIST-M samples to use
         pin_memory: Whether to pin memory in CPU
+        augment: Whether to apply data augmentation
     Returns:
         Tuple of (mnist_loader, mnist_test_loader, mnistm_loader, mnistm_test_loader)
     """
-    # Define transformations for MNIST (source domain)
-    transform_mnist = transforms.Compose([
-        transforms.Resize((28, 28)),
-        transforms.Grayscale(3),  # Convert to RGB
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
+    if augment:
+        # Augmented MNIST
+        transform_mnist = transforms.Compose([
+            transforms.Resize((28, 28)),
+            transforms.Grayscale(3),
+            transforms.RandomRotation(15),
+            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
 
-    # Define transformations for MNIST-M (target domain)
-    transform_mnistm = transforms.Compose([
-        transforms.Resize((28, 28)),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
+        # Augmented MNIST-M
+        transform_mnistm = transforms.Compose([
+            transforms.Resize((28, 28)),
+            transforms.ColorJitter(
+                brightness=0.3, contrast=0.3, saturation=0.3),
+            transforms.RandomAffine(degrees=15, translate=(0.1, 0.1)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+    else:
+        # Standard MNIST
+        transform_mnist = transforms.Compose([
+            transforms.Resize((28, 28)),
+            transforms.Grayscale(3),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
 
-    # Load source domain: MNIST dataset
+        # Standard MNIST-M
+        transform_mnistm = transforms.Compose([
+            transforms.Resize((28, 28)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+
+    # Load datasets
     mnist_train = MNIST(root='./data', train=True,
                         download=True, transform=transform_mnist)
     mnist_test = MNIST(root='./data', train=False,
@@ -105,7 +129,6 @@ def load_mnist_and_mnistm_from_folder(
     mnist_train = get_subset(mnist_train, mnist_ratio, seed)
     mnist_test = get_subset(mnist_test, mnist_ratio, seed)
 
-    # Load target domain: MNIST-M dataset
     mnistm_train = ImageFolder(
         root=f"{mnistm_root}/training", transform=transform_mnistm)
     mnistm_test = ImageFolder(
@@ -113,7 +136,7 @@ def load_mnist_and_mnistm_from_folder(
     mnistm_train = get_subset(mnistm_train, mnistm_ratio, seed)
     mnistm_test = get_subset(mnistm_test, mnistm_ratio, seed)
 
-    # Create dataloaders for training and testing
+    # DataLoaders
     mnist_loader = make_loader(mnist_train, batch_size, seed, shuffle=True,
                                num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True) if mnist_train else None
     mnist_test_loader = make_loader(mnist_test, batch_size, seed, shuffle=False,
