@@ -211,6 +211,29 @@ class SparseMoE(nn.Module):
         return final_output
 
 
+class TransformerWithScoring(nn.Module):
+    def __init__(self, img_size=28, patch_size=7, in_channels=3, emb_dim=256, num_heads=4, num_layers=3, dropout=0.1, keep_ratio=0.5):
+        super(TransformerWithScoring, self).__init__()
+
+        self.encoder = TransformerBlock(
+            img_size=img_size,
+            patch_size=patch_size,
+            in_channels=in_channels,
+            emb_dim=emb_dim,
+            num_heads=num_heads,
+            num_layers=num_layers,
+            dropout=dropout
+        )
+
+        self.scorer = PriorityScorer(embed_dim=emb_dim, keep_ratio=keep_ratio)
+
+    def forward(self, x):
+        encoder_output = self.encoder(x)         # Shape: [B, N, D]
+        selected_x, topk_indices = self.scorer(
+            encoder_output)  # Select important tokens
+        return selected_x
+
+
 class MeOViT(nn.Module):
     """
     Vision Transformer with Mixture of Experts for classification.
