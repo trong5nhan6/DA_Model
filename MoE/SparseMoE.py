@@ -50,7 +50,7 @@ class TransformerBlock(nn.Module):
 
         # Learnable classification token and positional embedding
         self.cls_token = nn.Parameter(torch.zeros(1, 1, emb_dim))
-        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, emb_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, emb_dim))
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
         nn.init.trunc_normal_(self.cls_token, std=0.02)
 
