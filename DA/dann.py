@@ -26,17 +26,20 @@ class GRL(nn.Module):
 
 # --- DANN model with pluggable Feature Extractor ---
 class DANN(nn.Module):
-    def __init__(self, feature_extractor, feat_dim, num_classes=10, grl_lambda=1.0):
+    def __init__(self, feature_extractor, feat_dim, num_classes=10, grl_lambda=1.0, label_classifier=None,
+                 domain_classifier=None):
         """
         Args:
             feature_extractor (nn.Module): Any module returning [B, feat_dim]
             feat_dim (int): Dimension of features output from feature_extractor
             num_classes (int): Number of class labels
             grl_lambda (float): λ value for gradient reversal
+            label_classifier (nn.Module): Optional custom label classifier
+            domain_classifier (nn.Module): Optional custom domain classifier
         """
         super().__init__()
         self.feature_extractor = feature_extractor
-        self.label_classifier = nn.Sequential(
+        self.label_classifier = label_classifier or nn.Sequential(
             nn.Linear(feat_dim, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
@@ -45,7 +48,7 @@ class DANN(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(64, num_classes),
         )
-        self.domain_classifier = nn.Sequential(
+        self.domain_classifier = domain_classifier or nn.Sequential(
             nn.Linear(feat_dim, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
