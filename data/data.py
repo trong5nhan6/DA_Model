@@ -122,8 +122,7 @@ def load_mnist_and_mnistm_from_folder(
         transform_mnistm = transforms.Compose([
             transforms.Resize((28, 28)),
             transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5), (0.5, 0.5)),
-            transforms.Lambda(lambda x: x.repeat(3, 1, 1))
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
 
     # Load datasets
