@@ -90,8 +90,10 @@ def load_mnist_and_mnistm_from_folder(
         transform_mnist = transforms.Compose([
             transforms.Resize((28, 28)),
             transforms.Grayscale(3),
-            transforms.RandomRotation(15),
-            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+            transforms.RandomRotation(10),
+            transforms.RandomAffine(degrees=0, translate=(
+                0.1, 0.1), scale=(0.95, 1.05)),
+            transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
@@ -100,8 +102,9 @@ def load_mnist_and_mnistm_from_folder(
         transform_mnistm = transforms.Compose([
             transforms.Resize((28, 28)),
             transforms.ColorJitter(
-                brightness=0.3, contrast=0.3, saturation=0.3),
+                brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
             transforms.RandomAffine(degrees=15, translate=(0.1, 0.1)),
+            transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
