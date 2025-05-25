@@ -56,7 +56,11 @@ class Backbone(nn.Module):
                 f"Backbone must output shape [B, C, 1, 1], got {feat.shape}"
             feat_channels = feat.shape[1]
 
-        self.proj = nn.Linear(feat_channels, output_dim)
+        self.proj = nn.Sequential(
+            nn.Linear(feat_channels, output_dim),
+            nn.BatchNorm1d(output_dim),
+            nn.ReLU(inplace=True)
+        )
 
     def forward(self, x):
         # Resize nếu cần
