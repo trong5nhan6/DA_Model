@@ -211,9 +211,9 @@ class SparseMoE(nn.Module):
         return final_output
 
 
-class TransformerWithScoring(nn.Module):
+class EncoderExtractor(nn.Module):
     def __init__(self, img_size=28, patch_size=7, in_channels=3, emb_dim=256, num_heads=4, num_layers=3, dropout=0.1, keep_ratio=0.5):
-        super(TransformerWithScoring, self).__init__()
+        super(EncoderExtractor, self).__init__()
 
         self.encoder = TransformerBlock(
             img_size=img_size,
