@@ -194,12 +194,7 @@ class SparseMoE(nn.Module):
                 weighted_output = expert_output * \
                     gating_scores  # [M, hidden_dim]
 
-                # Add to final output
-                batch_indices = torch.arange(B).unsqueeze(
-                    1).expand(-1, N).flatten().to(x.device)
-                selected_batch = batch_indices[flat_mask]  # [M]
-
-                final_output.index_add_(0, selected_batch, weighted_output)
+                final_output[expert_mask] += weighted_output.squeeze(1)
 
         return final_output
 

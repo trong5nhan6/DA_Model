@@ -14,14 +14,24 @@ class MCD(nn.Module):
         super().__init__()
         self.feature_extractor = feature_extractor
         self.classifier1 = nn.Sequential(
-            nn.Linear(feat_dim, 100),
-            nn.ReLU(),
-            nn.Linear(100, num_classes)
+            nn.Linear(feat_dim, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, num_classes),
+            # Binary domain prediction: source vs target
         )
         self.classifier2 = nn.Sequential(
-            nn.Linear(feat_dim, 100),
-            nn.ReLU(),
-            nn.Linear(100, num_classes)
+            nn.Linear(feat_dim, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, num_classes),
+            # Binary domain prediction: source vs target
         )
 
     def forward(self, x):
