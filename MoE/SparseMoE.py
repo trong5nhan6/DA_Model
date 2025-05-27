@@ -108,7 +108,7 @@ class SparseMoE(nn.Module):
         gating_output (torch.Tensor): Routing weights of shape [batch_size, seq_len, num_experts]
     """
 
-    def __init__(self, n_embed, experts, top_k, hidden_dim, capacity_ratio=1.0):
+    def __init__(self, n_embed, experts, top_k, hidden_dim, capacity_ratio=1.0, alpha=0.01):
         super().__init__()
         self.router = NoisyTopkRouter(n_embed, len(experts), top_k)
         self.experts = nn.ModuleList(experts)
@@ -116,6 +116,7 @@ class SparseMoE(nn.Module):
         self.hidden_dim = hidden_dim
         self.capacity_ratio = capacity_ratio
         self.balance_loss = 0.0
+        self.alpha = alpha
 
     def forward(self, x):
         B, N, D = x.shape
@@ -153,5 +154,5 @@ class SparseMoE(nn.Module):
             weighted_output = expert_output * gating_scores
             final_output[idx_tensor] += weighted_output
 
-        self.balance_loss = balancing_loss(gating_output)
+        self.balance_loss = balancing_loss(gating_output, self.alpha)
         return final_output.view(B, N, self.hidden_dim)
