@@ -123,7 +123,7 @@ class SparseMoE(nn.Module):
         device = x.device
 
         gating_output, indices = self.router(x)
-        flat_x = x.view(-1, D)
+        flat_x = x.contiguous().view(-1, D)
         flat_gating_output = gating_output.view(-1, E)
         flat_indices = indices.view(-1, self.top_k)
         final_output = torch.zeros(B * N, self.hidden_dim, device=device)
