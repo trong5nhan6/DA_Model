@@ -118,6 +118,7 @@ class SparseMoE(nn.Module):
         self.top_k = top_k
         self.hidden_dim = hidden_dim
         self.capacity_ratio = capacity_ratio
+        self.balance_loss = 0.0
 
     def forward(self, x):
         B, N, D = x.shape
@@ -155,4 +156,5 @@ class SparseMoE(nn.Module):
             weighted_output = expert_output * gating_scores
             final_output[idx_tensor] += weighted_output
 
-        return final_output.view(B, N, self.hidden_dim), gating_output
+        self.balance_loss = balancing_loss(gating_output)
+        return final_output.view(B, N, self.hidden_dim)
