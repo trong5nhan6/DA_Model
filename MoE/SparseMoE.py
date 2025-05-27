@@ -155,4 +155,4 @@ class SparseMoE(nn.Module):
             final_output[idx_tensor] += weighted_output
 
         self.balance_loss = balancing_loss(gating_output, self.alpha)
-        return final_output.view(B, N, self.hidden_dim)
+        return final_output
