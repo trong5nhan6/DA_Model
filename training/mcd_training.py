@@ -21,7 +21,7 @@ def results(history, epoch, cls_loss, dom_loss, train_acc, test_acc, target_acc)
     return history
 
 
-def plot_history(history, title=None):
+def plot_mcd_history(history, title=None):
     epochs = history['epoch']
     plt.figure(figsize=(10, 4))
 
