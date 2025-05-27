@@ -35,4 +35,4 @@ class MCD(nn.Module):
         features = self.feature_extractor(x)
         logits1 = self.classifier1(features)
         logits2 = self.classifier2(features)
-        return logits1, logits2, features
+        return logits1, logits2
