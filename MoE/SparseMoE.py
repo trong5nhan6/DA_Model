@@ -108,6 +108,55 @@ class SparseMoE(nn.Module):
         gating_output (torch.Tensor): Routing weights of shape [batch_size, seq_len, num_experts]
     """
 
+    # def __init__(self, n_embed, experts, top_k, hidden_dim, capacity_ratio=1.0, alpha=0.01):
+    #     super().__init__()
+    #     self.router = NoisyTopkRouter(n_embed, len(experts), top_k)
+    #     self.experts = nn.ModuleList(experts)
+    #     self.top_k = top_k
+    #     self.hidden_dim = hidden_dim
+    #     self.capacity_ratio = capacity_ratio
+    #     self.balance_loss = 0.0
+    #     self.alpha = alpha
+
+    # def forward(self, x):
+    #     B, N, D = x.shape
+    #     E = len(self.experts)
+    #     device = x.device
+
+    #     gating_output, indices = self.router(x)
+    #     flat_x = x.contiguous().view(-1, D)
+    #     flat_gating_output = gating_output.view(-1, E)
+    #     flat_indices = indices.view(-1, self.top_k)
+    #     final_output = torch.zeros(B * N, self.hidden_dim, device=device)
+
+    #     priority = compute_token_priority(gating_output, indices)
+    #     sorted_idx = torch.argsort(priority, descending=True)
+
+    #     total_tokens = B * N
+    #     capacity_per_expert = int(
+    #         self.capacity_ratio * self.top_k * total_tokens / E)
+    #     token_expert_map = [[] for _ in range(E)]
+
+    #     for idx in sorted_idx:
+    #         expert_ids = flat_indices[idx]
+    #         for eid in expert_ids:
+    #             if len(token_expert_map[eid]) < capacity_per_expert:
+    #                 token_expert_map[eid].append(idx.item())
+    #                 break
+
+    #     for eid, token_list in enumerate(token_expert_map):
+    #         if not token_list:
+    #             continue
+    #         idx_tensor = torch.tensor(token_list, device=device)
+    #         expert_input = flat_x[idx_tensor]
+    #         expert_output = self.experts[eid](expert_input)
+    #         gating_scores = flat_gating_output[idx_tensor, eid].unsqueeze(1)
+    #         weighted_output = expert_output * gating_scores
+    #         final_output[idx_tensor] += weighted_output
+
+    #     self.balance_loss = balancing_loss(gating_output, self.alpha)
+    #     return final_output
+
     def __init__(self, n_embed, experts, top_k, hidden_dim, capacity_ratio=1.0, alpha=0.01):
         super().__init__()
         self.router = NoisyTopkRouter(n_embed, len(experts), top_k)
@@ -123,19 +172,20 @@ class SparseMoE(nn.Module):
         E = len(self.experts)
         device = x.device
 
-        gating_output, indices = self.router(x)
-        flat_x = x.contiguous().view(-1, D)
-        flat_gating_output = gating_output.view(-1, E)
-        flat_indices = indices.view(-1, self.top_k)
-        final_output = torch.zeros(B * N, self.hidden_dim, device=device)
-
-        priority = compute_token_priority(gating_output, indices)
-        sorted_idx = torch.argsort(priority, descending=True)
+        gating_output, indices = self.router(
+            x)                     # [B, N, E], [B, N, k]
+        flat_x = x.contiguous().view(-1, D)                         # [B*N, D]
+        flat_gating_output = gating_output.view(-1, E)              # [B*N, E]
+        flat_indices = indices.view(-1, self.top_k)                 # [B*N, k]
 
         total_tokens = B * N
         capacity_per_expert = int(
             self.capacity_ratio * self.top_k * total_tokens / E)
         token_expert_map = [[] for _ in range(E)]
+
+        # Compute priority and sort
+        priority = compute_token_priority(gating_output, indices)
+        sorted_idx = torch.argsort(priority, descending=True)
 
         for idx in sorted_idx:
             expert_ids = flat_indices[idx]
@@ -144,15 +194,32 @@ class SparseMoE(nn.Module):
                     token_expert_map[eid].append(idx.item())
                     break
 
+        # Prepare output buffer: one output vector per sample
+        final_output = torch.zeros(B, self.hidden_dim, device=device)
+
+        # Map each token (B*N) to corresponding sample index (B)
+        batch_indices = torch.arange(B, device=device).unsqueeze(
+            1).expand(B, N).reshape(-1)  # [B*N]
+
         for eid, token_list in enumerate(token_expert_map):
             if not token_list:
                 continue
-            idx_tensor = torch.tensor(token_list, device=device)
+
+            idx_tensor = torch.tensor(
+                token_list, device=device)                # [M]
+            # [M, D]
             expert_input = flat_x[idx_tensor]
-            expert_output = self.experts[eid](expert_input)
-            gating_scores = flat_gating_output[idx_tensor, eid].unsqueeze(1)
-            weighted_output = expert_output * gating_scores
-            final_output[idx_tensor] += weighted_output
+            expert_output = self.experts[eid](
+                expert_input)                     # [M, hidden_dim]
+            gating_scores = flat_gating_output[idx_tensor, eid].unsqueeze(
+                1)   # [M, 1]
+            weighted_output = expert_output * \
+                gating_scores                    # [M, hidden_dim]
+
+            # Accumulate per-sample outputs using index_add
+            # [M]
+            sample_indices = batch_indices[idx_tensor]
+            final_output.index_add_(0, sample_indices, weighted_output)
 
         self.balance_loss = balancing_loss(gating_output, self.alpha)
-        return final_output
+        return final_output  # shape: [B, hidden_dim]
