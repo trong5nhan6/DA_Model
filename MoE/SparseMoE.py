@@ -174,7 +174,9 @@ class SparseMoE(nn.Module):
         final_output = torch.zeros(B, self.hidden_dim).to(x.device)
 
         # Flatten input and gating
-        flat_x = x.view(-1, D)                          # [B*N, D]
+        # flat_x = x.view(-1, D)
+        flat_x = x.reshape(-1, D)                          # [B*N, D]
+
         # [B*N, E]
         flat_gating_output = gating_output.view(-1, gating_output.size(-1))
 
