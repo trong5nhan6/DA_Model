@@ -1,5 +1,5 @@
 import torch
-from Model.CNN.until import Backbone
+from Model.CNN.utils import Backbone
 from torchvision import models
 
 

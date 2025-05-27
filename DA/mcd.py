@@ -3,10 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def classifier_discrepancy(p1, p2):
-    return torch.mean(torch.abs(F.softmax(p1, dim=1) - F.softmax(p2, dim=1)))
-
-
 class MCD(nn.Module):
     def __init__(self, feature_extractor, feat_dim, num_classes=10):
         """

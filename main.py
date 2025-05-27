@@ -1,5 +1,5 @@
 import torch
-from Model.CNN.until import Backbone
+from Model.CNN.utils import Backbone
 from Model.CNN.extract_backboone import get_resnet101
 from torchvision import models
 from MoE.DenseMoE import DenseMoE
