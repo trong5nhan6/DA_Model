@@ -58,7 +58,7 @@ class SoftMoE(nn.Module):
         Args:
             x (Tensor): input tensor of shape (b, m, d)
         Returns:
-            Tensor: output tensor of shape (b, m, d)
+            Tensor: output tensor of shape (b, d)
         """
         if x.size(-1) != self.in_features:
             raise ValueError(
@@ -93,6 +93,7 @@ class SoftMoE(nn.Module):
 
         # Combine outputs
         x = einsum(x, combine_weights, "b n p d, b m n p -> b m d")  # Y
+        x = x.mean(dim=1)  # hoặc torch.sum(x, dim=1)
 
         return x
 
