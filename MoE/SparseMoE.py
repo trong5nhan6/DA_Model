@@ -99,9 +99,9 @@ def auxiliary_loss(gating_output, indices, num_experts, beta=0.01):
     device = gating_output.device
 
     # Calculate number of tokens assigned to each expert
-    used_experts = torch.zeros(E, device=device)
+    used_experts = torch.zeros(E, device=device, dtype=torch.float32)
     used_experts.scatter_add_(
-        0, indices.view(-1), torch.ones_like(indices.view(-1)))
+        0, indices.view(-1), torch.ones_like(indices.view(-1), dtype=torch.float32))
 
     # Calculate expert usage ratio
     expert_usage_ratio = (used_experts > 0).float().mean()
@@ -112,9 +112,7 @@ def auxiliary_loss(gating_output, indices, num_experts, beta=0.01):
                                  torch.log(flat_gating + 1e-10), dim=1).mean()
 
     # Combine usage ratio and entropy penalties
-    # Penalize if too many or too few experts are used
     usage_penalty = torch.abs(expert_usage_ratio - 0.5)
-    # Penalize low entropy (high certainty) in routing
     entropy_penalty = -routing_entropy
 
     return beta * (usage_penalty + entropy_penalty)
