@@ -215,20 +215,3 @@ class SparseMoE(nn.Module):
     def get_total_loss(self):
         """Returns the sum of balance loss and auxiliary loss"""
         return self.balance_loss + self.auxiliary_loss
-
-
-x = torch.randn(2, 16, 128)
-B, N, D = x.shape
-gating_output, indices = NoisyTopkRouter(128, 4, 2)(x)
-print('----------------------------------')
-print(
-    f'gating_output.shape: {gating_output.shape}, indices.shape: {indices.shape}')
-flat_x = x.contiguous().view(-1, D)                         # [B*N, D]
-print('----------------------------------')
-print(f'flat_x.shape: {flat_x.shape}')
-flat_gating_output = gating_output.view(-1, E)              # [B*N, E]
-print('----------------------------------')
-print(f'flat_gating_output.shape: {flat_gating_output.shape}')
-flat_indices = indices.view(-1, top_k)
-print('----------------------------------')
-print(f'flat_indices.shape: {flat_indices.shape}')
