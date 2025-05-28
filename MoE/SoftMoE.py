@@ -1,29 +1,24 @@
-import math
-from typing import Optional, Union
-
 import torch
+import torch.nn as nn
+import math
+from torch import Tensor
+from typing import Optional, Union
 from einops import einsum, rearrange
-from torch import Tensor, nn
 
 
 class SoftMoE(nn.Module):
-    """A PyTorch module for Soft-MoE, as described in the paper:
+    """A PyTorch module for Soft-MoE, as described in:
         "From Sparse to Soft Mixtures of Experts"
         https://arxiv.org/pdf/2308.00951.pdf
 
-    einstein notation:
-    - b: batch size
-    - m: input sequence length
-    - d: embedding dimension
-    - n: num experts
-    - p: num slots per expert
-    - (n * p): total number of slots
-
     Args:
-        embed_dim (int): embedding dimension (d)
-        num_experts (int): number of experts (n)
-        slots_per_expert (int): number of slots per expert (p)
-        bias (bool): whether to include a bias term. Default: True.
+        in_features (int): input embedding dimension
+        out_features (int): output embedding dimension
+        experts (list[nn.Module]): list of expert modules
+        slots_per_expert (int): number of slots per expert
+        bias (bool): whether to include bias
+        device (str or torch.device, optional)
+        dtype (torch.dtype, optional)
     """
 
     def __init__(
@@ -45,7 +40,7 @@ class SoftMoE(nn.Module):
 
         self.phi = nn.Parameter(
             torch.empty(
-                (in_features, len(experts), slots_per_expert),
+                (in_features, self.num_experts, slots_per_expert),
                 device=device,
                 dtype=dtype,
             )
@@ -55,54 +50,48 @@ class SoftMoE(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        # NOTE: Copy weight initialization from 'nn.Linear.reset_parameters'
-        # TODO: Check for initialization strategy from the paper
         nn.init.kaiming_uniform_(self.phi, a=math.sqrt(5))
 
     def forward(self, x: Tensor) -> Tensor:
-        """Forward pass for the Soft-MoE layer, as described in:
-            https://arxiv.org/pdf/2308.00951.pdf
-        See: equations (1-3), algorithm 1, and figure 2
-
-        einstein notation:
-        - b: batch size
-        - m: input sequence length
-        - d: embedding dimension
-        - n: num experts
-        - p: num slots per expert
-        - (n * p): total number of slots
-
+        """
+        Forward pass for Soft-MoE.
         Args:
             x (Tensor): input tensor of shape (b, m, d)
-
         Returns:
             Tensor: output tensor of shape (b, m, d)
         """
         if x.size(-1) != self.in_features:
             raise ValueError(
-                f"Expected x.size(-1)={x.size(-1)} to match embed_dim={self.in_features}, "
+                f"Expected x.size(-1)={x.size(-1)} to match in_features={self.in_features}, "
                 f"but got {x.size(-1)}."
             )
         elif x.ndim != 3:
             raise ValueError(
                 f"Expected input to have 3 dimensions, but got {x.ndim}.")
 
+        # Compute logits and routing weights
         logits = einsum(x, self.phi, "b m d, d n p -> b m n p")
-        dispatch_weights = logits.softmax(dim=1)  # denoted 'D' in the paper
-        # NOTE: The 'torch.softmax' function does not support multiple values for the
-        # 'dim' argument (unlike jax), so we are forced to flatten the last two dimensions.
-        # Then, we rearrange the Tensor into its original shape.
+        dispatch_weights = logits.softmax(dim=1)  # D
         combine_weights = rearrange(
             logits.flatten(start_dim=2).softmax(dim=-1),
             "b m (n p) -> b m n p",
             n=self.num_experts,
         )
 
-        # NOTE: To save memory, I don't rename the intermediate tensors Y, Ys, Xs.
-        # Instead, I just overwrite the 'x' variable.  The names from the paper are
-        # included in a comment for each line below.
-        x = einsum(x, dispatch_weights, "b m d, b m n p -> b n p d")  # Xs
-        x = self.experts(x)  # Ys
+        # Dispatch input to experts: shape (b, n, p, d)
+        x = einsum(x, dispatch_weights, "b m d, b m n p -> b n p d")
+
+        # Apply each expert to its corresponding inputs
+        expert_outputs = []
+        for i, expert in enumerate(self.experts):
+            x_i = x[:, i]  # shape: (b, p, d)
+            y_i = expert(x_i)  # should return (b, p, out_features)
+            expert_outputs.append(y_i)
+
+        # Stack outputs: (b, n, p, out_features)
+        x = torch.stack(expert_outputs, dim=1)
+
+        # Combine outputs
         x = einsum(x, combine_weights, "b n p d, b m n p -> b m d")  # Y
 
         return x
