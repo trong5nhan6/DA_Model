@@ -44,35 +44,38 @@ class NoisyTopkRouter(nn.Module):
 
 def auxiliary_loss(gating_output, indices, num_experts, beta=0.01):
     """
-    Computes auxiliary loss to control the number of experts being used.
+    Computes auxiliary loss to encourage balanced expert usage and promote diversity in routing.
 
     Args:
-        gating_output (torch.Tensor): Routing weights of shape [batch_size, seq_len, num_experts]
-        indices (torch.Tensor): Selected expert indices of shape [batch_size, seq_len, top_k]
+        gating_output (torch.Tensor): Routing weights of shape [batch_size, num_experts]
+        indices (torch.Tensor): Selected expert indices of shape [batch_size, top_k]
         num_experts (int): Total number of experts
         beta (float): Scaling factor for the auxiliary loss
 
     Returns:
         torch.Tensor: Scalar auxiliary loss value
     """
-    B, N, E = gating_output.shape
+    B, E = gating_output.shape
     device = gating_output.device
 
-    # Calculate number of tokens assigned to each expert
+    # Count how many times each expert is selected (flattened over batch)
     used_experts = torch.zeros(E, device=device, dtype=torch.float32)
     used_experts.scatter_add_(
-        0, indices.view(-1), torch.ones_like(indices.view(-1), dtype=torch.float32))
+        0,
+        indices.view(-1),
+        torch.ones_like(indices.view(-1), dtype=torch.float32)
+    )
 
-    # Calculate expert usage ratio
+    # Calculate expert usage ratio (how many experts were used at least once)
     expert_usage_ratio = (used_experts > 0).float().mean()
 
-    # Calculate routing entropy
-    flat_gating = gating_output.view(-1, E)
-    routing_entropy = -torch.sum(flat_gating *
-                                 torch.log(flat_gating + 1e-10), dim=1).mean()
+    # Compute routing entropy (encourages softmax diversity)
+    routing_entropy = -torch.sum(gating_output *
+                                 torch.log(gating_output + 1e-10), dim=1).mean()
 
-    # Combine usage ratio and entropy penalties
+    # Penalty encourages using around 50% of experts (can adjust this target if needed)
     usage_penalty = torch.abs(expert_usage_ratio - 0.5)
+    # Encourage higher entropy (more uniform routing)
     entropy_penalty = -routing_entropy
 
     return beta * (usage_penalty + entropy_penalty)
