@@ -93,7 +93,8 @@ class SoftMoE(nn.Module):
 
         # Combine outputs
         x = einsum(x, combine_weights, "b n p d, b m n p -> b m d")  # Y
-        x = x.mean(dim=1)  
+        x = x.sum(dim=1)  
+        # x = x.mean(dim=1)  
 
         return x
 
