@@ -119,7 +119,14 @@ class SparseMoE(nn.Module):
             expert_mask = (indices == i).any(dim=-1)  # [B]
             if expert_mask.any():
                 expert_input = x[expert_mask]  # [M, D]
-                expert_output = expert(expert_input)  # [M, hidden_dim]
+
+                if expert_input.size(0) == 1:
+                    expert.eval()
+                    expert_output = expert(expert_input)
+                    expert.train()
+                else:
+                    expert_output = expert(expert_input)
+
                 gating_scores = gating_output[expert_mask, i].unsqueeze(
                     1)  # [M, 1]
                 weighted_output = expert_output * \
