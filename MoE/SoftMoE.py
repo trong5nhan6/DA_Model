@@ -54,49 +54,46 @@ class SoftMoE(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         """
-        Forward pass for Soft-MoE.
-        Args:
-            x (Tensor): input tensor of shape (b, m, d)
+        Forward for SoftMoE with input shape [B, D]
         Returns:
-            Tensor: output tensor of shape (b, d)
+            Tensor: [B, out_features]
         """
+        if x.ndim != 2:
+            raise ValueError(f"Expected input shape [B, D], got {x.shape}")
         if x.size(-1) != self.in_features:
             raise ValueError(
-                f"Expected x.size(-1)={x.size(-1)} to match in_features={self.in_features}, "
-                f"but got {x.size(-1)}."
-            )
-        elif x.ndim != 3:
-            raise ValueError(
-                f"Expected input to have 3 dimensions, but got {x.ndim}.")
+                f"Expected input dim {self.in_features}, got {x.size(-1)}")
 
-        # Compute logits and routing weights
-        logits = einsum(x, self.phi, "b m d, d n p -> b m n p")
-        dispatch_weights = logits.softmax(dim=1)  # D
-        combine_weights = rearrange(
-            logits.flatten(start_dim=2).softmax(dim=-1),
-            "b m (n p) -> b m n p",
-            n=self.num_experts,
-        )
+        B, D = x.shape
 
-        # Dispatch input to experts: shape (b, n, p, d)
-        x = einsum(x, dispatch_weights, "b m d, b m n p -> b n p d")
+        # Compute routing logits: [B, N, P]
+        logits = einsum(x, self.phi, "b d, d n p -> b n p")
 
-        # Apply each expert to its corresponding inputs
-        expert_outputs = []
+        # Compute dispatch and combine weights
+        dispatch_weights = logits.softmax(dim=-1)  # softmax over slots
+        combine_weights = logits.flatten(start_dim=1).softmax(
+            dim=-1)  # softmax over all slots
+        combine_weights = combine_weights.view(
+            B, self.num_experts, self.slots_per_expert)
+
+        # Dispatch input to experts
+        # Each expert gets [B, P, D]
+        expert_inputs = einsum(x, dispatch_weights, "b d, b n p -> b n p d")
+
+        # Apply experts
+        outputs = []
         for i, expert in enumerate(self.experts):
-            x_i = x[:, i]  # shape: (b, p, d)
-            y_i = expert(x_i)  # should return (b, p, out_features)
-            expert_outputs.append(y_i)
+            expert_input = expert_inputs[:, i]  # [B, P, D]
+            expert_output = expert(expert_input)  # [B, P, out_features]
+            outputs.append(expert_output)
 
-        # Stack outputs: (b, n, p, out_features)
-        x = torch.stack(expert_outputs, dim=1)
+        # Stack all expert outputs: [B, N, P, out_features]
+        outputs = torch.stack(outputs, dim=1)
 
-        # Combine outputs
-        x = einsum(x, combine_weights, "b n p d, b m n p -> b m d")  # Y
-        x = x.sum(dim=1)  
-        # x = x.mean(dim=1)  
+        # Combine using combine weights
+        y = einsum(outputs, combine_weights, "b n p d, b n p -> b d")
 
-        return x
+        return y
 
     def extra_repr(self) -> str:
         return (
