@@ -42,66 +42,6 @@ class NoisyTopkRouter(nn.Module):
         return routing_weights, indices
 
 
-# ---------- Priority Scorer ----------
-class PriorityScorer(nn.Module):
-    """
-    Module to score and select the most important patches.
-
-    Args:
-        embed_dim (int): Dimension of input embeddings
-        keep_ratio (float): Ratio of patches to keep (default: 0.5)
-    """
-
-    def __init__(self, embed_dim, keep_ratio=0.5):
-        super(PriorityScorer, self).__init__()
-        self.keep_ratio = keep_ratio
-        self.score_fn = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim // 2),
-            nn.ReLU(),
-            nn.Linear(embed_dim // 2, 1)  # Output: scalar score per patch
-        )
-
-    def forward(self, x):
-        """
-        Args:
-            x: [B, N, D] – patch embeddings
-        Returns:
-            selected_x: [B, K, D] – selected patch embeddings
-            topk_indices: [B, K] – indices of selected patches
-        """
-        B, N, D = x.shape
-        scores = self.score_fn(x).squeeze(-1)  # [B, N]
-        K = int(N * self.keep_ratio)
-        topk_scores, topk_indices = torch.topk(scores, k=K, dim=1)
-
-        # Gather top-K patch embeddings
-        batch_indices = torch.arange(B).unsqueeze(1).to(x.device)  # [B, 1]
-        selected_x = x[batch_indices, topk_indices]  # [B, K, D]
-
-        return selected_x, topk_indices
-
-
-# ---------- Balancing Loss ----------
-def balancing_loss(gating_output, alpha=0.01):
-    """
-    Computes the load balancing loss to ensure even distribution of tokens across experts.
-
-    Args:
-        gating_output (torch.Tensor): Routing weights of shape [batch_size, seq_len, num_experts]
-        alpha (float): Scaling factor for the balancing loss
-
-    Returns:
-        torch.Tensor: Scalar balancing loss value
-    """
-    B, N, E = gating_output.shape
-    T = B * N
-    flat_gating = gating_output.view(T, E)
-    p_i = flat_gating.sum(dim=0) / T
-    top1 = flat_gating.argmax(dim=1)
-    f_i = torch.bincount(top1, minlength=E).float() / T
-    return alpha * E * (f_i * p_i).sum()
-
-
 def auxiliary_loss(gating_output, indices, num_experts, beta=0.01):
     """
     Computes auxiliary loss to control the number of experts being used.
@@ -141,72 +81,40 @@ def auxiliary_loss(gating_output, indices, num_experts, beta=0.01):
 # ---------- SparseMoE ----------
 class SparseMoE(nn.Module):
     """
-    Sparse Mixture of Experts implementation with capacity-aware routing.
-
-    This implementation includes:
-    - Noisy top-k routing
-    - Token priority-based expert assignment
-    - Capacity constraints for each expert
-    - Load balancing mechanism
-
-    Args:
-        n_embed (int): Input embedding dimension
-        experts (List[nn.Module]): List of expert networks
-        top_k (int): Number of experts to route each token to
-        hidden_dim (int): Output dimension of the MoE layer
-        capacity_ratio (float): Ratio of tokens each expert can process
-        keep_ratio (float): Ratio of patches to keep (default: 0.5)
-        alpha (float): Scaling factor for the balancing loss
-        beta (float): Scaling factor for the auxiliary loss
-
-    Input:
-        x (torch.Tensor): Input tensor of shape [batch_size, seq_len, n_embed]
-
-    Output:
-        output (torch.Tensor): Output tensor of shape [batch_size, seq_len, hidden_dim]
-        gating_output (torch.Tensor): Routing weights of shape [batch_size, seq_len, num_experts]
+    SparseMixture of Experts (MoE) layer.
     """
 
-    def __init__(self, n_embed, experts, top_k, hidden_dim, keep_ratio=0.8, beta=0.01):
+    def __init__(self, n_embed, experts, top_k, hidden_dim, beta=0.01):
         super().__init__()
         self.router = NoisyTopkRouter(n_embed, len(experts), top_k)
         self.experts = nn.ModuleList(experts)
         self.top_k = top_k
         self.hidden_dim = hidden_dim
-        self.priority_scorer = PriorityScorer(n_embed, keep_ratio)
         self.beta = beta
-        self.auxiliary_loss = torch.tensor(0.0)  # default value
+        self.auxiliary_loss = torch.tensor(0.0)
 
     def forward(self, x):
-        x, topk_indices = self.priority_scorer(x)
-        B, N, D = x.shape
-        gating_output, indices = self.router(x)  # [B, N, E], [B, N, k]
-        final_output = torch.zeros(B, self.hidden_dim).to(x.device)
-
-        flat_x = x.view(-1, D)                          # [B*N, D]
-        # [B*N, E]
-        flat_gating_output = gating_output.view(-1, gating_output.size(-1))
+        """
+        Input:
+            x: [B, D] where D = n_embed
+        Output:
+            output: [B, hidden_dim]
+        """
+        B, D = x.shape
+        gating_output, indices = self.router(x)  # [B, E], [B, k]
+        final_output = torch.zeros(B, self.hidden_dim, device=x.device)
 
         for i, expert in enumerate(self.experts):
-            expert_mask = (indices == i).any(dim=-1)  # [B, N]
-            flat_mask = expert_mask.view(-1)          # [B*N]
-
-            if flat_mask.any():
-                expert_input = flat_x[flat_mask]       # [M, D]
-                expert_output = expert(expert_input)   # [M, hidden_dim]
-                gating_scores = flat_gating_output[flat_mask, i].unsqueeze(
+            expert_mask = (indices == i).any(dim=-1)  # [B]
+            if expert_mask.any():
+                expert_input = x[expert_mask]  # [M, D]
+                expert_output = expert(expert_input)  # [M, hidden_dim]
+                gating_scores = gating_output[expert_mask, i].unsqueeze(
                     1)  # [M, 1]
-
                 weighted_output = expert_output * \
                     gating_scores  # [M, hidden_dim]
+                final_output[expert_mask] += weighted_output
 
-                batch_indices = torch.arange(B).unsqueeze(
-                    1).expand(-1, N).flatten().to(x.device)
-                selected_batch = batch_indices[flat_mask]  # [M]
-
-                final_output.index_add_(0, selected_batch, weighted_output)
-
-        # Calculate and store auxiliary loss
         self.auxiliary_loss = auxiliary_loss(
             gating_output, indices, len(self.experts), self.beta)
 
