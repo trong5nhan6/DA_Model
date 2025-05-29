@@ -6,40 +6,48 @@ import torch.nn.functional as F
 # ---------- NoisyTopkRouter ----------
 class NoisyTopkRouter(nn.Module):
     """
-    A router that implements noisy top-k routing mechanism for Mixture of Experts.
-
-    This router adds controlled noise to the routing logits to encourage exploration
-    and prevent routing collapse.
+    Noisy Top-k Router for Mixture-of-Experts, adapted for input shape [B, D].
 
     Args:
         n_embed (int): Input embedding dimension
-        num_experts (int): Number of experts in the MoE layer
-        top_k (int): Number of experts to route each token to
-
-    Input:
-        x (torch.Tensor): Input tensor of shape [batch_size, seq_len, n_embed]
-
-    Output:
-        routing_weights (torch.Tensor): Routing weights of shape [batch_size, seq_len, num_experts]
-        indices (torch.Tensor): Selected expert indices of shape [batch_size, seq_len, top_k]
+        num_experts (int): Total number of experts
+        top_k (int): Number of experts to select per input
     """
 
     def __init__(self, n_embed, num_experts, top_k):
         super().__init__()
         self.top_k = top_k
+        self.num_experts = num_experts
         self.route_linear = nn.Linear(n_embed, num_experts)
         self.noise_linear = nn.Linear(n_embed, num_experts)
 
     def forward(self, x):
-        logits = self.route_linear(x)
-        noise_std = F.softplus(self.noise_linear(x))
-        noise = torch.randn_like(logits) * noise_std
-        noisy_logits = logits + noise
-        topk_logits, indices = noisy_logits.topk(self.top_k, dim=-1)
-        mask = torch.full_like(noisy_logits, float('-inf'))
-        sparse_logits = mask.scatter(-1, indices, topk_logits)
-        routing_weights = F.softmax(sparse_logits, dim=-1)
-        return routing_weights, indices
+        """
+        Args:
+            x (Tensor): Input tensor of shape [B, D]
+
+        Returns:
+            routing_weights (Tensor): [B, num_experts] (softmax over selected experts)
+            indices (Tensor): [B, top_k] indices of top-k experts
+        """
+        logits = self.route_linear(x)  # [B, E]
+        noise_std = F.softplus(self.noise_linear(x))  # [B, E]
+        noise = torch.randn_like(logits) * noise_std  # [B, E]
+        noisy_logits = logits + noise  # [B, E]
+
+        # Select top-k experts for each input in the batch
+        topk_logits, indices = noisy_logits.topk(
+            self.top_k, dim=-1)  # [B, k], [B, k]
+
+        # Build sparse logits with -inf for non-topk
+        sparse_logits = torch.full_like(noisy_logits, float('-inf'))  # [B, E]
+        # keep top-k logits only
+        sparse_logits.scatter_(1, indices, topk_logits)
+
+        # Softmax over sparse logits
+        routing_weights = F.softmax(sparse_logits, dim=-1)  # [B, E]
+
+        return routing_weights, indices  # [B, E], [B, k]
 
 
 def auxiliary_loss(gating_output, indices, num_experts, beta=0.01):
