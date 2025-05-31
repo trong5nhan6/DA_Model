@@ -68,7 +68,7 @@ def evaluate(model, dataloader, device):
 
 
 def train_mcd(model, source_loader, target_loader, source_test_loader, target_test_loader,
-              device, epochs=20, lr=1e-3, step_size=5, gamma=0.5, beta=1.0, log_fn=None, k=4):
+              device, epochs=20, lr=1e-3, step_size=5, gamma=0.5, beta=1.0, log_fn=None, k=4, auxiliary_loss=False):
 
     optimizer_f = torch.optim.Adam(model.feature_extractor.parameters(), lr=lr)
     optimizer_c = torch.optim.Adam(
@@ -106,7 +106,12 @@ def train_mcd(model, source_loader, target_loader, source_test_loader, target_te
             out1, out2 = model(xs)
             loss1 = criterion(out1, ys)
             loss2 = criterion(out2, ys)
-            loss = loss1 + loss2
+
+            if auxiliary_loss:
+                loss = loss1 + loss2 + model.classifier1.auxiliary_loss + model.classifier2.auxiliary_loss
+            else:
+                loss = loss1 + loss2
+                
             loss.backward()
             optimizer_f.step()
             optimizer_c.step()
