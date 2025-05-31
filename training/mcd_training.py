@@ -68,7 +68,7 @@ def evaluate(model, dataloader, device):
 
 
 def train_mcd(model, source_loader, target_loader, source_test_loader, target_test_loader,
-              device, epochs=20, lr=1e-3, step_size=5, gamma=0.5, beta=1.0, log_fn=None):
+              device, epochs=20, lr=1e-3, step_size=5, gamma=0.5, beta=1.0, log_fn=None, k=4):
 
     optimizer_f = torch.optim.Adam(model.feature_extractor.parameters(), lr=lr)
     optimizer_c = torch.optim.Adam(
@@ -124,7 +124,7 @@ def train_mcd(model, source_loader, target_loader, source_test_loader, target_te
             # -------------------------
             # Step 3: Minimize discrepancy by updating feature extractor
             # -------------------------
-            for _ in range(1):  # S thường = 1
+            for _ in range(k):  # S thường = 1
                 optimizer_f.zero_grad()
                 out1, out2 = model(xt)
                 loss_dis = classifier_discrepancy(out1, out2)
