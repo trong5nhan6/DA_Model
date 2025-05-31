@@ -2,7 +2,7 @@ import torch
 from Model.CNN.utils import Backbone
 from torchvision import models
 import torch.nn as nn
-
+import torch.nn.init as init
 
 def get_resnet18(in_channels=3, img_size=(224, 224), output_dim=512):
     model = models.resnet18(pretrained=True)
@@ -74,3 +74,32 @@ def load_pretrained_backbone(path="Model/CNN/fashionmnist_backbone.pth"):
     model = FeatureExtractor()
     model.load_state_dict(torch.load(path, map_location='cpu'))
     return model
+
+
+class Expert(nn.Module):
+    def __init__(self, feat_dim, num_classes):
+        super(Expert, self).__init__()
+        self.classifier = nn.Sequential(
+            nn.Linear(feat_dim, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(inplace=True),
+
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(inplace=True),
+
+            nn.Linear(64, num_classes)
+        )
+
+        # Áp dụng He Initialization cho các lớp Linear
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(self, x):
+        return self.classifier(x)
