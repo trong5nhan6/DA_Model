@@ -49,7 +49,7 @@ def evaluate(model, dataloader, device):
 
 
 def train_dann(model, source_loader, target_loader, source_test_loader, target_test_loader,
-               device, epochs=10, lr=1e-3, step_size=5, gamma=0.5, beta=0.8, log_fn=None):
+               device, epochs=10, lr=1e-3, step_size=5, gamma=0.5, beta=0.8, log_fn=None, auxiliary_loss=False):
     """
     Train DANN (Domain Adaptation Neural Network) model
     Args:
@@ -120,7 +120,10 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             # Calculate classification and domain adaptation losses
             loss_cls = criterion(y_cls_src, ys)  # Classification loss
             loss_dom = criterion(y_dom, y_domain)  # Domain adaptation loss
-            loss = loss_cls + loss_dom*beta
+            if auxiliary_loss:
+                loss = loss_cls + loss_dom*beta + model.classifier1.auxiliary_loss + model.classifier2.auxiliary_loss
+            else:
+                loss = loss_cls + loss_dom*beta
 
             # Backward pass and parameter update
             optimizer.zero_grad()
