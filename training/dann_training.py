@@ -167,11 +167,12 @@ def results(history, epoch, cls_loss, dom_loss, train_acc, test_acc, target_acc)
     return history
 
 
-def plot_dann_history(history):
+def plot_dann_history(history, title=None):
     """
     Plot training history
     Args:
         history: Dictionary containing training history
+        title: Title for the plot (optional)
     """
     epochs = history['epoch']
 
@@ -201,5 +202,10 @@ def plot_dann_history(history):
     plt.ylabel("Accuracy (%)")
     plt.legend()
 
-    plt.tight_layout()
+    # Only set suptitle if title is not None
+    if title is not None:
+        plt.suptitle(title, fontsize=14)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+    else:
+        plt.tight_layout()
     plt.show()

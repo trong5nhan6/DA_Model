@@ -22,27 +22,39 @@ def results(history, epoch, cls_loss, dom_loss, train_acc, test_acc, target_acc)
 
 
 def plot_mcd_history(history, title=None):
+    """
+    Plot training history
+    Args:
+        history: Dictionary containing training history
+        title: Title for the plot (optional)
+    """
     epochs = history['epoch']
+
     plt.figure(figsize=(10, 4))
 
     # Plot losses
     plt.subplot(1, 2, 1)
-    plt.plot(epochs, history['train_cls_loss'], label='Cls Loss')
-    plt.plot(epochs, history['disc_loss'], label='Discrepancy Loss')
+    plt.plot(epochs, history['train_cls_loss'], marker='o',
+             color='blue', label='Cls Loss')
+    plt.plot(epochs, history['disc_loss'], marker='o',
+             color='orange', label='Discrepancy Loss')
+    plt.title("Losses")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
     plt.legend()
-    plt.title('Losses')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
 
     # Plot accuracies
     plt.subplot(1, 2, 2)
-    plt.plot(epochs, [a * 100 for a in history['train_acc']], label='Train')
-    plt.plot(epochs, [a * 100 for a in history['test_acc']], label='Test')
-    plt.plot(epochs, [a * 100 for a in history['target_acc']], label='Target')
+    plt.plot(epochs, [a * 100 for a in history['train_acc']],
+             marker='o', color='green', label='Train Accuracy')
+    plt.plot(epochs, [a * 100 for a in history['test_acc']],
+             marker='o', color='red', label='Test Accuracy')
+    plt.plot(epochs, [a * 100 for a in history['target_acc']],
+             marker='o', color='purple', label='Target Accuracy')
+    plt.title("Accuracies (%)")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy (%)")
     plt.legend()
-    plt.title('Accuracies (%)')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy (%)')
 
     # Only set suptitle if title is not None
     if title is not None:
@@ -50,7 +62,6 @@ def plot_mcd_history(history, title=None):
         plt.tight_layout(rect=[0, 0, 1, 0.95])
     else:
         plt.tight_layout()
-
     plt.show()
 
 
@@ -108,10 +119,11 @@ def train_mcd(model, source_loader, target_loader, source_test_loader, target_te
             loss2 = criterion(out2, ys)
 
             if auxiliary_loss:
-                loss = loss1 + loss2 + model.classifier1.auxiliary_loss + model.classifier2.auxiliary_loss
+                loss = loss1 + loss2 + model.classifier1.auxiliary_loss + \
+                    model.classifier2.auxiliary_loss
             else:
                 loss = loss1 + loss2
-                
+
             loss.backward()
             optimizer_f.step()
             optimizer_c.step()
