@@ -82,13 +82,18 @@ def train_mcd(model, source_loader, target_loader, source_test_loader, target_te
               device, epochs=20, lr=1e-3, step_size=5, gamma=0.5, beta=1.0, log_fn=None,
               k=1, auxiliary_loss=False):
 
+    # Optimizers for feature extractor and individual classifiers
     optimizer_f = torch.optim.Adam(model.feature_extractor.parameters(), lr=lr)
-    optimizer_c = torch.optim.Adam(
-        list(model.classifier1.parameters()) + list(model.classifier2.parameters()), lr=lr)
+    optimizer_c1 = torch.optim.Adam(model.classifier1.parameters(), lr=lr)
+    optimizer_c2 = torch.optim.Adam(model.classifier2.parameters(), lr=lr)
+
+    # Learning rate schedulers
     scheduler_f = torch.optim.lr_scheduler.StepLR(
         optimizer_f, step_size, gamma)
-    scheduler_c = torch.optim.lr_scheduler.StepLR(
-        optimizer_c, step_size, gamma)
+    scheduler_c1 = torch.optim.lr_scheduler.StepLR(
+        optimizer_c1, step_size, gamma)
+    scheduler_c2 = torch.optim.lr_scheduler.StepLR(
+        optimizer_c2, step_size, gamma)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -114,7 +119,8 @@ def train_mcd(model, source_loader, target_loader, source_test_loader, target_te
             # Step 1: Train on source (classification loss)
             # -------------------------
             optimizer_f.zero_grad()
-            optimizer_c.zero_grad()
+            optimizer_c1.zero_grad()
+            optimizer_c2.zero_grad()
             out1, out2 = model(xs)
             loss1 = criterion(out1, ys)
             loss2 = criterion(out2, ys)
@@ -127,22 +133,24 @@ def train_mcd(model, source_loader, target_loader, source_test_loader, target_te
 
             loss.backward()
             optimizer_f.step()
-            optimizer_c.step()
+            optimizer_c1.step()
+            optimizer_c2.step()
 
             # -------------------------
             # Step 2: Maximize discrepancy on target
             # -------------------------
-            for _ in range(1):  # T thường = 1
-                optimizer_c.zero_grad()
-                out1, out2 = model(xt)
-                loss_dis = classifier_discrepancy(out1, out2)
-                (-loss_dis).backward()
-                optimizer_c.step()
+            optimizer_c1.zero_grad()
+            optimizer_c2.zero_grad()
+            out1, out2 = model(xt)
+            loss_dis = classifier_discrepancy(out1, out2)
+            (-loss_dis).backward()
+            optimizer_c1.step()
+            optimizer_c2.step()
 
             # -------------------------
             # Step 3: Minimize discrepancy by updating feature extractor
             # -------------------------
-            for _ in range(k):  # S thường = 1
+            for _ in range(k):
                 optimizer_f.zero_grad()
                 out1, out2 = model(xt)
                 loss_dis = classifier_discrepancy(out1, out2)
@@ -153,8 +161,10 @@ def train_mcd(model, source_loader, target_loader, source_test_loader, target_te
             total_disc_loss += loss_dis.item() * xt.size(0)
             total_samples += xs.size(0)
 
+        # Step learning rate
         scheduler_f.step()
-        scheduler_c.step()
+        scheduler_c1.step()
+        scheduler_c2.step()
 
         avg_cls_loss = total_cls_loss / total_samples
         avg_disc_loss = total_disc_loss / total_samples
