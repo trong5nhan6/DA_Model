@@ -79,7 +79,8 @@ def evaluate(model, dataloader, device):
 
 
 def train_mcd(model, source_loader, target_loader, source_test_loader, target_test_loader,
-              device, epochs=20, lr=1e-3, step_size=5, gamma=0.5, beta=1.0, log_fn=None, k=4, auxiliary_loss=False):
+              device, epochs=20, lr=1e-3, step_size=5, gamma=0.5, beta=1.0, log_fn=None,
+              k=1, auxiliary_loss=False):
 
     optimizer_f = torch.optim.Adam(model.feature_extractor.parameters(), lr=lr)
     optimizer_c = torch.optim.Adam(
