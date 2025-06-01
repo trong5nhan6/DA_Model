@@ -121,7 +121,7 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             loss_cls = criterion(y_cls_src, ys)  # Classification loss
             loss_dom = criterion(y_dom, y_domain)  # Domain adaptation loss
             if auxiliary_loss:
-                loss = loss_cls + loss_dom*beta + model.classifier1.auxiliary_loss + model.classifier2.auxiliary_loss
+                loss = loss_cls + loss_dom*beta + model.label_classifier.auxiliary_loss + model.domain_classifier.auxiliary_loss
             else:
                 loss = loss_cls + loss_dom*beta
 
