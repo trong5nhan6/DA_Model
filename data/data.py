@@ -62,6 +62,7 @@ def get_subset(dataset, ratio, seed=42):
 
 def load_mnist_and_mnistm_from_folder(
     mnistm_root,
+    img_size=(28, 28),
     batch_size=64,
     seed=42,
     num_workers=4,
