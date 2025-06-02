@@ -89,7 +89,7 @@ def load_mnist_and_mnistm_from_folder(
     if augment:
         # Augmented MNIST
         transform_mnist = transforms.Compose([
-            transforms.Resize((28, 28)),
+            transforms.Resize(img_size),
             transforms.Grayscale(3),
             transforms.RandomRotation(10),
             transforms.RandomAffine(degrees=0, translate=(
@@ -101,7 +101,7 @@ def load_mnist_and_mnistm_from_folder(
 
         # Augmented MNIST-M
         transform_mnistm = transforms.Compose([
-            transforms.Resize((28, 28)),
+            transforms.Resize(img_size),
             transforms.ColorJitter(
                 brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
             transforms.RandomAffine(degrees=15, translate=(0.1, 0.1)),
@@ -112,7 +112,7 @@ def load_mnist_and_mnistm_from_folder(
     else:
         # Standard MNIST
         transform_mnist = transforms.Compose([
-            transforms.Resize((28, 28)),
+            transforms.Resize(img_size),
             # transforms.Grayscale(3),
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,)),
@@ -121,7 +121,7 @@ def load_mnist_and_mnistm_from_folder(
 
         # Standard MNIST-M
         transform_mnistm = transforms.Compose([
-            transforms.Resize((28, 28)),
+            transforms.Resize(img_size),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
