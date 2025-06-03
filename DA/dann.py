@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+import torch.nn.init as init
 # --- GRL: Gradient Reversal Layer ---
 
 
@@ -24,7 +24,7 @@ class GRL(nn.Module):
         return GradientReversalFunction.apply(x, self.lambda_)
 
 
-# --- DANN model with pluggable Feature Extractor ---
+# --- DANN model with pluggable Feature Extractor ---   
 class DANN(nn.Module):
     def __init__(self, feature_extractor, feat_dim, num_classes=10, grl_lambda=1.0, label_classifier=None,
                  domain_classifier=None):
@@ -59,6 +59,17 @@ class DANN(nn.Module):
             # Binary domain prediction: source vs target
         )
         self.grl = GRL(lambda_=grl_lambda)
+
+                # Apply He initialization
+        self._init_weights(self.label_classifier)
+        self._init_weights(self.domain_classifier)
+
+        def _init_weights(self, module):
+            for m in module.modules():
+                if isinstance(m, nn.Linear):
+                    init.kaiming_normal_(m.weight, nonlinearity='relu')
+                    if m.bias is not None:
+                        nn.init.constant_(m.bias, 0)
 
     def forward(self, x, alpha=1.0):
         # Expect shape [B, feat_dim]
