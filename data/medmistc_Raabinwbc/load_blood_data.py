@@ -84,7 +84,7 @@ class FilteredBloodMNIST(Dataset):
 
 # ======== Dataset WBC Folder ========
 class WBCFolderDataset(Dataset):
-    def __init__(self, data_root, transform=None):
+    def __init__(self, data_root, transform=None, seed=42):
         self.data = []
         self.transform = transform
         for folder, label_name in folder_to_labelname.items():
@@ -96,6 +96,9 @@ class WBCFolderDataset(Dataset):
                 if fname.lower().endswith((".jpg", ".jpeg", ".png")):
                     fpath = os.path.join(folder_path, fname)
                     self.data.append((fpath, label_id))
+
+        random.seed(seed)
+        random.shuffle(self.data)
 
     def __len__(self):
         return len(self.data)
@@ -169,10 +172,10 @@ def load_wbc(
         transforms.Normalize(mean, std)
     ])
 
-    train_ds = WBCFolderDataset(train_root, transform=transform)
-    test_ds = WBCFolderDataset(test_root, transform=transform)
+    train_ds = WBCFolderDataset(train_root, transform=transform, seed=seed)
+    test_ds = WBCFolderDataset(test_root, transform=transform, seed=seed)
 
-    train_ds = get_subset(train_ds, train_ratio, seed)
+    train_ds = get_subset(train_ds, train_ratio, seed)  
     test_ds = get_subset(test_ds, test_ratio, seed)
 
     return (
