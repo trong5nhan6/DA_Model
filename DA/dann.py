@@ -64,12 +64,12 @@ class DANN(nn.Module):
         self._init_weights(self.label_classifier)
         self._init_weights(self.domain_classifier)
 
-        def _init_weights(self, module):
-            for m in module.modules():
-                if isinstance(m, nn.Linear):
-                    init.kaiming_normal_(m.weight, nonlinearity='relu')
-                    if m.bias is not None:
-                        nn.init.constant_(m.bias, 0)
+    def _init_weights(self, module):
+        for m in module.modules():
+            if isinstance(m, nn.Linear):
+                init.kaiming_normal_(m.weight, nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x, alpha=1.0):
         # Expect shape [B, feat_dim]
