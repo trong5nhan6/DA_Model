@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+
+
 # --- GRL: Gradient Reversal Layer ---
-
-
 class GradientReversalFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, lambda_):
