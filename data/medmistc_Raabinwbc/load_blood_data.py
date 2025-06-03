@@ -9,15 +9,15 @@ from medmnist import BloodMNIST
 
 # ======== label mapping ========
 ORIGINAL_TO_NEW = {
-    0: 1,  # basophil
-    1: 2,  # eosinophil
-    4: 3,  # lymphocyte
-    5: 4,  # monocyte
-    6: 5   # neutrophil
+    0: 0,  # basophil (original 0 -> new 0)
+    1: 1,  # eosinophil
+    4: 2,  # lymphocyte
+    5: 3,  # monocyte
+    6: 4   # neutrophil
 }
 
 WBC_LABELS = ["basophil", "eosinophil", "lymphocyte", "monocyte", "neutrophil"]
-WBC_LABEL2ID = {label: idx + 1 for idx, label in enumerate(WBC_LABELS)}
+WBC_LABEL2ID = {label: idx for idx, label in enumerate(WBC_LABELS)}
 folder_to_labelname = {
     "Basophil": "basophil",
     "Eosinophil": "eosinophil",

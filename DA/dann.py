@@ -24,7 +24,7 @@ class GRL(nn.Module):
         return GradientReversalFunction.apply(x, self.lambda_)
 
 
-# --- DANN model with pluggable Feature Extractor ---   
+# --- DANN model with pluggable Feature Extractor ---
 class DANN(nn.Module):
     def __init__(self, feature_extractor, feat_dim, num_classes=10, grl_lambda=1.0, label_classifier=None,
                  domain_classifier=None):
@@ -60,7 +60,7 @@ class DANN(nn.Module):
         )
         self.grl = GRL(lambda_=grl_lambda)
 
-                # Apply He initialization
+        # Apply He initialization
         self._init_weights(self.label_classifier)
         self._init_weights(self.domain_classifier)
 
