@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.init as init
 
 
 class MCD(nn.Module):
@@ -33,6 +34,17 @@ class MCD(nn.Module):
             nn.Linear(64, num_classes),
             # Binary domain prediction: source vs target
         )
+
+        # Apply He initialization
+        self._init_weights(self.classifier1)
+        self._init_weights(self.classifier2)
+
+    def _init_weights(self, module):
+        for m in module.modules():
+            if isinstance(m, nn.Linear):
+                init.kaiming_normal_(m.weight, nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         """
