@@ -118,3 +118,17 @@ def load_bloodmnist(
                               num_workers=num_workers, pin_memory=pin_memory)
 
     return train_loader, test_loader
+
+
+if __name__ == "__main__":
+    set_seed(123)
+
+    train_loader, test_loader = load_bloodmnist(batch_size=32)
+
+    x, y = next(iter(train_loader))
+    print("Train batch shape:", x.shape)
+    print("Train labels:", y[:10])
+
+    x, y = next(iter(test_loader))
+    print("Test batch shape:", x.shape)
+    print("Test labels:", y[:10])
