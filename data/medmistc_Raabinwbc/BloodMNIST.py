@@ -76,8 +76,8 @@ class FilteredBloodMNIST(Dataset):
 
 
 def load_bloodmnist(
-    img_size=(64, 64),
-    batch_size=64,
+    img_size=(28, 28),
+    batch_size=32,
     seed=42,
     num_workers=4,
     train_ratio=1.0,
