@@ -142,10 +142,11 @@ def load_bloodmnist(
     train_ds = get_subset(train_ds, train_ratio, seed)
     test_ds = get_subset(test_ds, test_ratio, seed)
 
-    return (
-        make_loader(train_ds, batch_size, seed, True, num_workers, pin_memory),
-        make_loader(test_ds, batch_size, seed, False, num_workers, pin_memory)
-    )
+    bloodmnist_loader = make_loader(dataset=train_ds, batch_size=batch_size, seed=seed, shuffle=True,
+                                    num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True)
+    bloodmnist_test_loader = make_loader(dataset=test_ds, batch_size=batch_size, seed=seed, shuffle=False,
+                                         num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True)
+    return bloodmnist_loader, bloodmnist_test_loader
 
 
 # ======== Loader cho WBC Folder ========
@@ -175,10 +176,11 @@ def load_wbc(
     train_ds = WBCFolderDataset(train_root, transform=transform, seed=seed)
     test_ds = WBCFolderDataset(test_root, transform=transform, seed=seed)
 
-    train_ds = get_subset(train_ds, train_ratio, seed)  
+    train_ds = get_subset(train_ds, train_ratio, seed)
     test_ds = get_subset(test_ds, test_ratio, seed)
 
-    return (
-        make_loader(train_ds, batch_size, seed, True, num_workers, pin_memory),
-        make_loader(test_ds, batch_size, seed, False, num_workers, pin_memory)
-    )
+    wbc_loader = make_loader(dataset=train_ds, batch_size=batch_size, seed=seed, shuffle=True,
+                             num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True)
+    wbc_test_loader = make_loader(dataset=test_ds, batch_size=batch_size, seed=seed, shuffle=False,
+                                  num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True)
+    return wbc_loader, wbc_test_loader
