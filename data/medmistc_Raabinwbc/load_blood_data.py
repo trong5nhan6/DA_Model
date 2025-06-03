@@ -125,14 +125,20 @@ def load_bloodmnist(
 ):
     mean = [0.5] * 3
     std = [0.5] * 3
-    transform = transforms.Compose([
-        transforms.Resize(img_size),
-        transforms.RandomHorizontalFlip() if augment else transforms.Lambda(lambda x: x),
-        transforms.RandomRotation(
-            15) if augment else transforms.Lambda(lambda x: x),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std)
-    ])
+    if augment:
+        transform = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std)
+        ])
+    else:
+        transform = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std)
+        ])
 
     train_ds = FilteredBloodMNIST(
         split="train", transform=transform, download=download)
@@ -164,14 +170,20 @@ def load_wbc(
 ):
     mean = [0.5] * 3
     std = [0.5] * 3
-    transform = transforms.Compose([
-        transforms.Resize(img_size),
-        transforms.RandomHorizontalFlip() if augment else transforms.Lambda(lambda x: x),
-        transforms.RandomRotation(
-            15) if augment else transforms.Lambda(lambda x: x),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std)
-    ])
+    if augment:
+        transform = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std)
+        ])
+    else:
+        transform = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std)
+        ])
 
     train_ds = WBCFolderDataset(train_root, transform=transform, seed=seed)
     test_ds = WBCFolderDataset(test_root, transform=transform, seed=seed)
