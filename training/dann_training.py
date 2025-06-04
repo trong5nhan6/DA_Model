@@ -121,7 +121,8 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             loss_cls = criterion(y_cls_src, ys)  # Classification loss
             loss_dom = criterion(y_dom, y_domain)  # Domain adaptation loss
             if auxiliary_loss:
-                loss = loss_cls + loss_dom*beta + model.label_classifier.auxiliary_loss + model.domain_classifier.auxiliary_loss
+                loss = loss_cls + loss_dom*beta + model.label_classifier.auxiliary_loss + \
+                    model.domain_classifier.auxiliary_loss
             else:
                 loss = loss_cls + loss_dom*beta
 
@@ -172,43 +173,41 @@ def results(history, epoch, cls_loss, dom_loss, train_acc, test_acc, target_acc)
 
 def plot_dann_history(history, title=None):
     """
-    Plot training history
+    Plot training history with legends below each plot, and increased figure size.
     Args:
         history: Dictionary containing training history
         title: Title for the plot (optional)
     """
     epochs = history['epoch']
-
-    plt.figure(figsize=(10, 4))
+    fig, axs = plt.subplots(1, 2, figsize=(14, 6))  # ⬅️ tăng chiều rộng và cao
 
     # Plot losses
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, history['train_cls_loss'], marker='o',
-             color='blue', label='Classification Loss')
-    plt.plot(epochs, history['domain_loss'], marker='o',
-             color='orange', label='Domain Loss')
-    plt.title("Losses")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
+    axs[0].plot(epochs, history['train_cls_loss'], marker='o',
+                color='blue', label='Classification Loss')
+    axs[0].plot(epochs, history['domain_loss'], marker='o',
+                color='orange', label='Domain Loss')
+    axs[0].set_title("Losses")
+    axs[0].set_xlabel("Epoch")
+    axs[0].set_ylabel("Loss")
+    axs[0].legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2)
 
     # Plot accuracies
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, [a * 100 for a in history['train_acc']],
-             marker='o', color='green', label='Train Accuracy')
-    plt.plot(epochs, [a * 100 for a in history['test_acc']],
-             marker='o', color='red', label='Test Accuracy')
-    plt.plot(epochs, [a * 100 for a in history['target_acc']],
-             marker='o', color='purple', label='Target Accuracy')
-    plt.title("Accuracies (%)")
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy (%)")
-    plt.legend()
+    axs[1].plot(epochs, [a * 100 for a in history['train_acc']],
+                marker='o', color='green', label='Train Accuracy')
+    axs[1].plot(epochs, [a * 100 for a in history['test_acc']],
+                marker='o', color='red', label='Test Accuracy')
+    axs[1].plot(epochs, [a * 100 for a in history['target_acc']],
+                marker='o', color='purple', label='Target Accuracy')
+    axs[1].set_title("Accuracies (%)")
+    axs[1].set_xlabel("Epoch")
+    axs[1].set_ylabel("Accuracy (%)")
+    axs[1].legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3)
 
-    # Only set suptitle if title is not None
+    # Super title and layout
     if title is not None:
-        plt.suptitle(title, fontsize=14)
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        fig.suptitle(title, fontsize=16)
+        plt.tight_layout(rect=[0, 0.05, 1, 0.92])
     else:
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0.05, 1, 1])
+
     plt.show()
