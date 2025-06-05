@@ -35,7 +35,7 @@ def test_majority_minority_mixup():
         use_mixup=True,
         augment=True,
         mixup_alpha=0.2,
-        minority_threshold=0.5  # Classes with count < 0.5 * mean_count are minority
+        minority_threshold=0.2  # Classes with count < 0.5 * mean_count are minority
     )
 
     # Get a batch

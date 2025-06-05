@@ -267,7 +267,7 @@ def load_bloodmnist(
     use_mixup=False,
     mixup_alpha=0.2,
     device=None,
-    minority_threshold=0.5  # New parameter for minority class identification
+    minority_threshold=0.2  # New parameter for minority class identification
 ):
     if use_mixup:
         # Define strong and weak augmentations for mixup
@@ -290,6 +290,17 @@ def load_bloodmnist(
     train_ds = get_subset(train_ds, train_ratio, seed)
     test_ds = get_subset(test_ds, test_ratio, seed)
 
+    # Create test loader (same for both cases)
+    test_loader = make_loader(
+        dataset=test_ds,
+        batch_size=batch_size,
+        seed=seed,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=True
+    )
+
     if use_mixup:
         # Identify minority and majority classes
         minority_classes, majority_classes = identify_minority_classes(
@@ -325,7 +336,7 @@ def load_bloodmnist(
                 alpha=mixup_alpha
             )
 
-        return train_loader, test_loader, mixup_fn, mixup_criterion
+        return train_loader, test_loader, mixup_fn
     else:
         train_loader = make_loader(
             dataset=train_ds,
@@ -337,17 +348,7 @@ def load_bloodmnist(
             persistent_workers=True
         )
 
-    test_loader = make_loader(
-        dataset=test_ds,
-        batch_size=batch_size,
-        seed=seed,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-        persistent_workers=True
-    )
-
-    return train_loader, test_loader
+        return train_loader, test_loader
 
 
 # ======== Loader cho WBC Folder ========
@@ -365,7 +366,7 @@ def load_wbc(
     use_mixup=False,
     mixup_alpha=0.2,
     device=None,
-    minority_threshold=0.5
+    minority_threshold=0.2  # New parameter for minority class identification
 ):
     if use_mixup:
         # Define strong and weak augmentations for mixup
@@ -378,12 +379,25 @@ def load_wbc(
         train_transform = get_standard_transform(img_size, augment)
         test_transform = get_standard_transform(img_size, False)
 
+    # Load datasets
     train_ds = WBCFolderDataset(
         train_root, transform=train_transform, seed=seed)
     test_ds = WBCFolderDataset(test_root, transform=test_transform, seed=seed)
 
+    # Apply subset if needed
     train_ds = get_subset(train_ds, train_ratio, seed)
     test_ds = get_subset(test_ds, test_ratio, seed)
+
+    # Create test loader (same for both cases)
+    test_loader = make_loader(
+        dataset=test_ds,
+        batch_size=batch_size,
+        seed=seed,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=True
+    )
 
     if use_mixup:
         # Identify minority and majority classes
@@ -420,7 +434,7 @@ def load_wbc(
                 alpha=mixup_alpha
             )
 
-        return train_loader, test_loader, mixup_fn, mixup_criterion
+        return train_loader, test_loader, mixup_fn
     else:
         train_loader = make_loader(
             dataset=train_ds,
@@ -432,14 +446,4 @@ def load_wbc(
             persistent_workers=True
         )
 
-    test_loader = make_loader(
-        dataset=test_ds,
-        batch_size=batch_size,
-        seed=seed,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-        persistent_workers=True
-    )
-
-    return train_loader, test_loader
+        return train_loader, test_loader
