@@ -2,6 +2,7 @@ import os
 import random
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from torchvision import transforms
 from PIL import Image
@@ -70,31 +71,46 @@ def get_standard_transform(img_size, augment=False):
 
 def mixup_criterion(criterion, pred, y_a, y_b, lam):
     """
-    Returns the mixup loss
+    Simple mixup loss function
+    Args:
+        criterion: Base loss function (e.g., CrossEntropyLoss)
+        pred: Model predictions
+        y_a: First set of labels
+        y_b: Second set of labels
+        lam: Mixup lambda
+    Returns:
+        loss: Combined loss
     """
     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
 
 # ======== Class-wise Augmentation ========
 class ClassWiseAugDataset(Dataset):
-    def __init__(self, base_dataset, minority_classes, strong_aug, weak_aug):
-        self.base_dataset = base_dataset
-        # Convert to set for faster lookup
-        self.minority_classes = set(minority_classes)
+    def __init__(self, dataset, minority_classes, strong_aug, weak_aug):
+        self.dataset = dataset
+        self.minority_classes = minority_classes
         self.strong_aug = strong_aug
         self.weak_aug = weak_aug
 
-        # Calculate class distribution
-        self.class_counts = Counter([label for _, label in base_dataset])
-        self.majority_classes = set(
-            range(len(self.class_counts))) - self.minority_classes
-
     def __len__(self):
-        return len(self.base_dataset)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        image, label = self.base_dataset[idx]
-        aug = self.strong_aug if label in self.minority_classes else self.weak_aug
+        image, label = self.dataset[idx]
+
+        # Convert tensor to PIL Image if needed
+        if isinstance(image, torch.Tensor):
+            if image.dim() == 3:  # If it's a single image
+                image = transforms.ToPILImage()(image)
+            else:  # If it's a batch
+                image = transforms.ToPILImage()(image.squeeze(0))
+
+        # Apply augmentation based on class
+        if label in self.minority_classes:
+            aug = self.strong_aug
+        else:
+            aug = self.weak_aug
+
         return aug(image), label
 
 
@@ -147,19 +163,20 @@ def get_class_distribution(dataset):
     return class_counts
 
 
-def identify_minority_classes(dataset, threshold=0.5):
+def identify_minority_classes(dataset, threshold=0.1):
     """
     Identify minority classes based on class distribution
     Args:
         dataset: Dataset to analyze
-        threshold: Classes with count less than threshold * mean_count are considered minority
+        threshold: Classes with count less than threshold * total_samples are considered minority
+                  (threshold is a percentage, e.g., 0.1 means 10% of total data)
     Returns:
         minority_classes: List of minority class indices
         majority_classes: List of majority class indices
     """
     class_counts = get_class_distribution(dataset)
-    mean_count = sum(class_counts.values()) / len(class_counts)
-    threshold_count = mean_count * threshold
+    total_samples = sum(class_counts.values())
+    threshold_count = total_samples * threshold
 
     minority_classes = [
         cls for cls, count in class_counts.items() if count < threshold_count]
@@ -273,12 +290,10 @@ def load_bloodmnist(
         # Define strong and weak augmentations for mixup
         strong_transform = get_strong_augmentation(img_size)
         weak_transform = get_weak_augmentation(img_size)
-        train_transform = strong_transform if augment else weak_transform
-        test_transform = weak_transform
-    else:
-        # Use standard transforms
-        train_transform = get_standard_transform(img_size, augment)
-        test_transform = get_standard_transform(img_size, False)
+
+    # Use standard transforms for both train and test
+    train_transform = get_standard_transform(img_size, augment)
+    test_transform = get_standard_transform(img_size, False)
 
     # Load datasets
     train_ds = FilteredBloodMNIST(
@@ -372,12 +387,10 @@ def load_wbc(
         # Define strong and weak augmentations for mixup
         strong_transform = get_strong_augmentation(img_size)
         weak_transform = get_weak_augmentation(img_size)
-        train_transform = strong_transform if augment else weak_transform
-        test_transform = weak_transform
-    else:
-        # Use standard transforms
-        train_transform = get_standard_transform(img_size, augment)
-        test_transform = get_standard_transform(img_size, False)
+
+    # Use standard transforms for both train and test
+    train_transform = get_standard_transform(img_size, augment)
+    test_transform = get_standard_transform(img_size, False)
 
     # Load datasets
     train_ds = WBCFolderDataset(
