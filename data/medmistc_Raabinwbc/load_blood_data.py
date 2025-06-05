@@ -168,9 +168,8 @@ def identify_minority_classes(dataset, threshold=0.5):
 
     return minority_classes, majority_classes
 
+
 # ======== Utils ========
-
-
 def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
@@ -203,9 +202,8 @@ def get_subset(dataset, ratio, seed=42):
     indices = random.sample(range(len(dataset)), int(len(dataset) * ratio))
     return Subset(dataset, indices)
 
+
 # ======== Dataset BloodMNIST đã lọc ========
-
-
 class FilteredBloodMNIST(Dataset):
     def __init__(self, split="train", transform=None, download=True):
         self.dataset = BloodMNIST(
@@ -225,9 +223,8 @@ class FilteredBloodMNIST(Dataset):
         new_label = ORIGINAL_TO_NEW[int(label)]
         return img, new_label
 
+
 # ======== Dataset WBC Folder ========
-
-
 class WBCFolderDataset(Dataset):
     def __init__(self, data_root, transform=None, seed=42):
         self.data = []
@@ -255,9 +252,8 @@ class WBCFolderDataset(Dataset):
             image = self.transform(image)
         return image, label
 
+
 # ======== Loader cho BloodMNIST ========
-
-
 def load_bloodmnist(
     img_size=(28, 28),
     batch_size=32,
@@ -353,9 +349,8 @@ def load_bloodmnist(
 
     return train_loader, test_loader
 
+
 # ======== Loader cho WBC Folder ========
-
-
 def load_wbc(
     train_root,
     test_root,
