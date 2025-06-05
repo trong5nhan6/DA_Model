@@ -385,8 +385,8 @@ def load_wbc(
 ):
     if use_mixup:
         # Define strong and weak augmentations for mixup
-        strong_transform = get_strong_augmentation(img_size)
-        weak_transform = get_weak_augmentation(img_size)
+        strong_transform = get_standard_transform(img_size, False)
+        weak_transform = get_standard_transform(img_size, False)
 
     # Use standard transforms for both train and test
     train_transform = get_standard_transform(img_size, augment)
