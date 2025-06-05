@@ -17,6 +17,21 @@ def compute_grl_lambda(current_epoch, total_epochs):
     return 2.0 / (1.0 + np.exp(-10 * p)) - 1.0
 
 
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    """
+    Simple mixup loss function
+    Args:
+        criterion: Base loss function (e.g., CrossEntropyLoss)
+        pred: Model predictions
+        y_a: First set of labels
+        y_b: Second set of labels
+        lam: Mixup lambda
+    Returns:
+        loss: Combined loss
+    """
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
 @torch.no_grad()
 def evaluate(model, dataloader, device):
     """
@@ -49,7 +64,9 @@ def evaluate(model, dataloader, device):
 
 
 def train_dann(model, source_loader, target_loader, source_test_loader, target_test_loader,
-               device, epochs=10, lr=1e-3, step_size=5, gamma=0.5, beta=0.8, log_fn=None, auxiliary_loss=False):
+               device, epochs=10, lr=1e-3, step_size=5, gamma=0.5, beta=0.8, log_fn=None, 
+               
+               auxiliary_loss=False, use_mixup=False):
     """
     Train DANN (Domain Adaptation Neural Network) model
     Args:
@@ -65,6 +82,8 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
         gamma: Learning rate decay factor
         beta: Weight for domain adaptation loss
         log_fn: Callback function for logging (optional)
+        auxiliary_loss: Whether to use auxiliary loss
+        use_mixup: Whether to use mixup augmentation
     Returns:
         Training history containing metrics
     """
@@ -106,6 +125,15 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
                 device, non_blocking=True)
             xt = xt.to(device, non_blocking=True)
 
+            # Apply mixup if enabled
+            if use_mixup:
+                # Get mixup function from source loader
+                mixup_fn = source_loader.dataset.mixup_fn
+                # Apply mixup to source data
+                xs, y_a, y_b, lam = mixup_fn(xs, ys, device)
+                # Update ys to be the mixed labels
+                ys = (y_a, y_b, lam)
+
             # Combine source and target data
             x_combined = torch.cat([xs, xt], dim=0)
             y_domain = torch.cat([
@@ -118,8 +146,15 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             y_cls_src = y_cls[:xs.size(0)]
 
             # Calculate classification and domain adaptation losses
-            loss_cls = criterion(y_cls_src, ys)  # Classification loss
+            if use_mixup:
+                # Mixup loss calculation using mixup_criterion
+                y_a, y_b, lam = ys
+                loss_cls = mixup_criterion(criterion, y_cls_src, y_a, y_b, lam)
+            else:
+                loss_cls = criterion(y_cls_src, ys)  # Classification loss
+
             loss_dom = criterion(y_dom, y_domain)  # Domain adaptation loss
+
             if auxiliary_loss:
                 loss = loss_cls + loss_dom*beta + model.label_classifier.auxiliary_loss + \
                     model.domain_classifier.auxiliary_loss
