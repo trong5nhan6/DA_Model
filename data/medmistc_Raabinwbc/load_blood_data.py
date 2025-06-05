@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, DataLoader, Subset
 from torchvision import transforms
 from PIL import Image
 from medmnist import BloodMNIST
+from collections import Counter
 
 # ======== label mapping ========
 ORIGINAL_TO_NEW = {
@@ -27,7 +28,149 @@ folder_to_labelname = {
 }
 
 
+# ======== Mixup Data Augmentation ========
+def get_strong_augmentation(img_size):
+    return transforms.Compose([
+        transforms.Resize(img_size),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.RandomRotation(30),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5] * 3, [0.5] * 3)
+    ])
+
+
+def get_weak_augmentation(img_size):
+    return transforms.Compose([
+        transforms.Resize(img_size),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5] * 3, [0.5] * 3)
+    ])
+
+
+def get_standard_transform(img_size, augment=False):
+    if augment:
+        return transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5] * 3, [0.5] * 3)
+        ])
+    else:
+        return transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5] * 3, [0.5] * 3)
+        ])
+
+
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    """
+    Returns the mixup loss
+    """
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
+# ======== Class-wise Augmentation ========
+class ClassWiseAugDataset(Dataset):
+    def __init__(self, base_dataset, minority_classes, strong_aug, weak_aug):
+        self.base_dataset = base_dataset
+        # Convert to set for faster lookup
+        self.minority_classes = set(minority_classes)
+        self.strong_aug = strong_aug
+        self.weak_aug = weak_aug
+
+        # Calculate class distribution
+        self.class_counts = Counter([label for _, label in base_dataset])
+        self.majority_classes = set(
+            range(len(self.class_counts))) - self.minority_classes
+
+    def __len__(self):
+        return len(self.base_dataset)
+
+    def __getitem__(self, idx):
+        image, label = self.base_dataset[idx]
+        aug = self.strong_aug if label in self.minority_classes else self.weak_aug
+        return aug(image), label
+
+
+def minority_majority_mixup(images, labels, minority_classes, majority_classes, alpha=0.4):
+    """
+    Mixup between minority and majority classes
+    Args:
+        images: Batch of images
+        labels: Batch of labels
+        minority_classes: List of minority class indices
+        majority_classes: List of majority class indices
+        alpha: Mixup alpha parameter
+    Returns:
+        mixed_images: Mixed images
+        y_a: Labels of minority samples
+        y_b: Labels of majority samples
+        lam: Mixup lambda
+    """
+    # Convert to sets for faster lookup
+    minority_classes = set(minority_classes)
+    majority_classes = set(majority_classes)
+
+    # Get indices for minority and majority samples
+    minor_idx = [i for i, y in enumerate(labels) if y in minority_classes]
+    major_idx = [i for i, y in enumerate(labels) if y in majority_classes]
+
+    n = min(len(minor_idx), len(major_idx))
+    if n == 0:
+        return images, labels, labels, 1.0
+
+    # Randomly select n pairs
+    selected_minor = random.sample(minor_idx, n)
+    selected_major = random.sample(major_idx, n)
+
+    # Generate mixup lambda
+    lam = np.random.beta(alpha, alpha)
+
+    # Mixup images
+    mixed = lam * images[selected_minor] + (1 - lam) * images[selected_major]
+    y_a = labels[selected_minor]
+    y_b = labels[selected_major]
+
+    return mixed, y_a, y_b, lam
+
+
+def get_class_distribution(dataset):
+    """Get class distribution from dataset"""
+    labels = [label for _, label in dataset]
+    class_counts = Counter(labels)
+    return class_counts
+
+
+def identify_minority_classes(dataset, threshold=0.5):
+    """
+    Identify minority classes based on class distribution
+    Args:
+        dataset: Dataset to analyze
+        threshold: Classes with count less than threshold * mean_count are considered minority
+    Returns:
+        minority_classes: List of minority class indices
+        majority_classes: List of majority class indices
+    """
+    class_counts = get_class_distribution(dataset)
+    mean_count = sum(class_counts.values()) / len(class_counts)
+    threshold_count = mean_count * threshold
+
+    minority_classes = [
+        cls for cls, count in class_counts.items() if count < threshold_count]
+    majority_classes = [
+        cls for cls, count in class_counts.items() if count >= threshold_count]
+
+    return minority_classes, majority_classes
+
 # ======== Utils ========
+
+
 def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
@@ -60,8 +203,9 @@ def get_subset(dataset, ratio, seed=42):
     indices = random.sample(range(len(dataset)), int(len(dataset) * ratio))
     return Subset(dataset, indices)
 
-
 # ======== Dataset BloodMNIST đã lọc ========
+
+
 class FilteredBloodMNIST(Dataset):
     def __init__(self, split="train", transform=None, download=True):
         self.dataset = BloodMNIST(
@@ -81,8 +225,9 @@ class FilteredBloodMNIST(Dataset):
         new_label = ORIGINAL_TO_NEW[int(label)]
         return img, new_label
 
-
 # ======== Dataset WBC Folder ========
+
+
 class WBCFolderDataset(Dataset):
     def __init__(self, data_root, transform=None, seed=42):
         self.data = []
@@ -110,8 +255,9 @@ class WBCFolderDataset(Dataset):
             image = self.transform(image)
         return image, label
 
-
 # ======== Loader cho BloodMNIST ========
+
+
 def load_bloodmnist(
     img_size=(28, 28),
     batch_size=32,
@@ -121,41 +267,95 @@ def load_bloodmnist(
     test_ratio=1.0,
     pin_memory=True,
     augment=False,
-    download=True
+    download=True,
+    use_mixup=False,
+    mixup_alpha=0.2,
+    device=None,
+    minority_threshold=0.5  # New parameter for minority class identification
 ):
-    mean = [0.5] * 3
-    std = [0.5] * 3
-    if augment:
-        transform = transforms.Compose([
-            transforms.Resize(img_size),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(15),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std)
-        ])
+    if use_mixup:
+        # Define strong and weak augmentations for mixup
+        strong_transform = get_strong_augmentation(img_size)
+        weak_transform = get_weak_augmentation(img_size)
+        train_transform = strong_transform if augment else weak_transform
+        test_transform = weak_transform
     else:
-        transform = transforms.Compose([
-            transforms.Resize(img_size),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std)
-        ])
+        # Use standard transforms
+        train_transform = get_standard_transform(img_size, augment)
+        test_transform = get_standard_transform(img_size, False)
 
+    # Load datasets
     train_ds = FilteredBloodMNIST(
-        split="train", transform=transform, download=download)
+        split="train", transform=train_transform, download=download)
     test_ds = FilteredBloodMNIST(
-        split="test", transform=transform, download=download)
+        split="test", transform=test_transform, download=download)
 
+    # Apply subset if needed
     train_ds = get_subset(train_ds, train_ratio, seed)
     test_ds = get_subset(test_ds, test_ratio, seed)
 
-    bloodmnist_loader = make_loader(dataset=train_ds, batch_size=batch_size, seed=seed, shuffle=True,
-                                    num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True)
-    bloodmnist_test_loader = make_loader(dataset=test_ds, batch_size=batch_size, seed=seed, shuffle=False,
-                                         num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True)
-    return bloodmnist_loader, bloodmnist_test_loader
+    if use_mixup:
+        # Identify minority and majority classes
+        minority_classes, majority_classes = identify_minority_classes(
+            train_ds, minority_threshold)
+        print(f"Minority classes: {minority_classes}")
+        print(f"Majority classes: {majority_classes}")
 
+        # Create class-wise augmented dataset
+        train_ds = ClassWiseAugDataset(
+            train_ds,
+            minority_classes=minority_classes,
+            strong_aug=strong_transform,
+            weak_aug=weak_transform
+        )
+
+        # Create data loader
+        train_loader = make_loader(
+            dataset=train_ds,
+            batch_size=batch_size,
+            seed=seed,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=True
+        )
+
+        # Create mixup function with minority/majority classes
+        def mixup_fn(x, y, device=None):
+            return minority_majority_mixup(
+                x, y,
+                minority_classes=minority_classes,
+                majority_classes=majority_classes,
+                alpha=mixup_alpha
+            )
+
+        return train_loader, test_loader, mixup_fn, mixup_criterion
+    else:
+        train_loader = make_loader(
+            dataset=train_ds,
+            batch_size=batch_size,
+            seed=seed,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=True
+        )
+
+    test_loader = make_loader(
+        dataset=test_ds,
+        batch_size=batch_size,
+        seed=seed,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=True
+    )
+
+    return train_loader, test_loader
 
 # ======== Loader cho WBC Folder ========
+
+
 def load_wbc(
     train_root,
     test_root,
@@ -166,33 +366,85 @@ def load_wbc(
     train_ratio=1.0,
     test_ratio=1.0,
     pin_memory=True,
-    augment=False
+    augment=False,
+    use_mixup=False,
+    mixup_alpha=0.2,
+    device=None,
+    minority_threshold=0.5
 ):
-    mean = [0.5] * 3
-    std = [0.5] * 3
-    if augment:
-        transform = transforms.Compose([
-            transforms.Resize(img_size),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(15),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std)
-        ])
+    if use_mixup:
+        # Define strong and weak augmentations for mixup
+        strong_transform = get_strong_augmentation(img_size)
+        weak_transform = get_weak_augmentation(img_size)
+        train_transform = strong_transform if augment else weak_transform
+        test_transform = weak_transform
     else:
-        transform = transforms.Compose([
-            transforms.Resize(img_size),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std)
-        ])
+        # Use standard transforms
+        train_transform = get_standard_transform(img_size, augment)
+        test_transform = get_standard_transform(img_size, False)
 
-    train_ds = WBCFolderDataset(train_root, transform=transform, seed=seed)
-    test_ds = WBCFolderDataset(test_root, transform=transform, seed=seed)
+    train_ds = WBCFolderDataset(
+        train_root, transform=train_transform, seed=seed)
+    test_ds = WBCFolderDataset(test_root, transform=test_transform, seed=seed)
 
     train_ds = get_subset(train_ds, train_ratio, seed)
     test_ds = get_subset(test_ds, test_ratio, seed)
 
-    wbc_loader = make_loader(dataset=train_ds, batch_size=batch_size, seed=seed, shuffle=True,
-                             num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True)
-    wbc_test_loader = make_loader(dataset=test_ds, batch_size=batch_size, seed=seed, shuffle=False,
-                                  num_workers=num_workers, pin_memory=pin_memory, persistent_workers=True)
-    return wbc_loader, wbc_test_loader
+    if use_mixup:
+        # Identify minority and majority classes
+        minority_classes, majority_classes = identify_minority_classes(
+            train_ds, minority_threshold)
+        print(f"Minority classes: {minority_classes}")
+        print(f"Majority classes: {majority_classes}")
+
+        # Create class-wise augmented dataset
+        train_ds = ClassWiseAugDataset(
+            train_ds,
+            minority_classes=minority_classes,
+            strong_aug=strong_transform,
+            weak_aug=weak_transform
+        )
+
+        # Create data loader
+        train_loader = make_loader(
+            dataset=train_ds,
+            batch_size=batch_size,
+            seed=seed,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=True
+        )
+
+        # Create mixup function with minority/majority classes
+        def mixup_fn(x, y, device=None):
+            return minority_majority_mixup(
+                x, y,
+                minority_classes=minority_classes,
+                majority_classes=majority_classes,
+                alpha=mixup_alpha
+            )
+
+        return train_loader, test_loader, mixup_fn, mixup_criterion
+    else:
+        train_loader = make_loader(
+            dataset=train_ds,
+            batch_size=batch_size,
+            seed=seed,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=True
+        )
+
+    test_loader = make_loader(
+        dataset=test_ds,
+        batch_size=batch_size,
+        seed=seed,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=True
+    )
+
+    return train_loader, test_loader
