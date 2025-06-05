@@ -65,7 +65,7 @@ def evaluate(model, dataloader, device):
 
 def train_dann(model, source_loader, target_loader, source_test_loader, target_test_loader,
                device, epochs=10, lr=1e-3, step_size=5, gamma=0.5, beta=0.8,
-               log_fn=None, auxiliary_loss=False, use_mixup=False, mixup_fn=None, mixup_alpha=0.4):
+               log_fn=None, auxiliary_loss=False, use_mixup=False, mixup_fn=None):
     """
     Train DANN (Domain Adaptation Neural Network) model
     Args:
@@ -129,7 +129,7 @@ def train_dann(model, source_loader, target_loader, source_test_loader, target_t
             # Apply mixup if enabled
             if use_mixup and mixup_fn is not None:
                 # Apply mixup to source data
-                xs, y_a, y_b, lam = mixup_fn(xs, ys, device, mixup_alpha)
+                xs, y_a, y_b, lam = mixup_fn(xs, ys, device)
                 # Update ys to be the mixed labels
                 ys = (y_a, y_b, lam)
 
