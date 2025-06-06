@@ -290,7 +290,7 @@ def load_bloodmnist(
         # Define strong and weak augmentations for mixup
         strong_transform = get_standard_transform(img_size, False)
         # weak_transform = get_standard_transform(img_size, False)
-        weak_transform = get_strong_augmentation(img_size)
+        weak_transform = get_weak_augmentation(img_size)
 
 
     # Use standard transforms for both train and test
@@ -389,7 +389,7 @@ def load_wbc(
         # Define strong and weak augmentations for mixup
         strong_transform = get_standard_transform(img_size, False)
         # weak_transform = get_standard_transform(img_size, False)
-        weak_transform = get_strong_augmentation(img_size)
+        weak_transform = get_weak_augmentation(img_size)
 
     # Use standard transforms for both train and test
     train_transform = get_standard_transform(img_size, augment)
